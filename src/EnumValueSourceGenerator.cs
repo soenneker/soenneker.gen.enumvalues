@@ -14,6 +14,9 @@ namespace Soenneker.Gen.EnumValues;
 [Generator]
 public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 {
+    private const int _valueFrozenThreshold = 128;
+    private const int _nameFrozenThreshold = 256;
+
     private static readonly DiagnosticDescriptor _typeMustBePartialDescriptor = new(
         id: "SEV001",
         title: "EnumValue type must be partial",
@@ -151,7 +154,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             return;
         }
 
-        var instances = GatherInstances(compilation, enumType, valueType);
+        List<EnumInstance> instances = GatherInstances(compilation, enumType, valueType);
 
         if (instances.Count == 0)
         {
@@ -242,9 +245,9 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 if (!fieldSymbol.IsStatic || !SymbolEqualityComparer.Default.Equals(fieldSymbol.Type, enumType))
                     continue;
 
-                if (TryGetValueLiteralFromField(compilation, fieldSymbol, valueType, out string? valueLiteral, out Location? location))
+                if (TryGetValueLiteralFromField(compilation, fieldSymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location))
                 {
-                    result.Add(new EnumInstance(fieldSymbol.Name, valueLiteral!, location ?? fieldSymbol.Locations.FirstOrDefault() ?? Location.None));
+                    result.Add(new EnumInstance(fieldSymbol.Name, valueLiteral!, stringValue, location ?? fieldSymbol.Locations.FirstOrDefault() ?? Location.None));
                 }
             }
             else if (member is IPropertySymbol propertySymbol)
@@ -252,9 +255,9 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 if (!propertySymbol.IsStatic || !SymbolEqualityComparer.Default.Equals(propertySymbol.Type, enumType))
                     continue;
 
-                if (TryGetValueLiteralFromProperty(compilation, propertySymbol, valueType, out string? valueLiteral, out Location? location))
+                if (TryGetValueLiteralFromProperty(compilation, propertySymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location))
                 {
-                    result.Add(new EnumInstance(propertySymbol.Name, valueLiteral!, location ?? propertySymbol.Locations.FirstOrDefault() ?? Location.None));
+                    result.Add(new EnumInstance(propertySymbol.Name, valueLiteral!, stringValue, location ?? propertySymbol.Locations.FirstOrDefault() ?? Location.None));
                 }
             }
         }
@@ -264,9 +267,10 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         return result;
     }
 
-    private static bool TryGetValueLiteralFromField(Compilation compilation, IFieldSymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out Location? location)
+    private static bool TryGetValueLiteralFromField(Compilation compilation, IFieldSymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location)
     {
         valueLiteral = null;
+        stringValue = null;
         location = null;
 
         foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
@@ -280,7 +284,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
             SemanticModel semanticModel = compilation.GetSemanticModel(initializer.SyntaxTree);
 
-            if (TryGetValueLiteralFromInitializer(semanticModel, initializer.Value, valueType, out valueLiteral))
+            if (TryGetValueLiteralFromInitializer(semanticModel, initializer.Value, valueType, out valueLiteral, out stringValue))
             {
                 location = initializer.GetLocation();
                 return true;
@@ -290,9 +294,10 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         return false;
     }
 
-    private static bool TryGetValueLiteralFromProperty(Compilation compilation, IPropertySymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out Location? location)
+    private static bool TryGetValueLiteralFromProperty(Compilation compilation, IPropertySymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location)
     {
         valueLiteral = null;
+        stringValue = null;
         location = null;
 
         foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
@@ -307,7 +312,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
             SemanticModel semanticModel = compilation.GetSemanticModel(expression.SyntaxTree);
 
-            if (TryGetValueLiteralFromInitializer(semanticModel, expression, valueType, out valueLiteral))
+            if (TryGetValueLiteralFromInitializer(semanticModel, expression, valueType, out valueLiteral, out stringValue))
             {
                 location = expression.GetLocation();
                 return true;
@@ -317,9 +322,10 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         return false;
     }
 
-    private static bool TryGetValueLiteralFromInitializer(SemanticModel semanticModel, ExpressionSyntax initializerExpression, INamedTypeSymbol valueType, out string? valueLiteral)
+    private static bool TryGetValueLiteralFromInitializer(SemanticModel semanticModel, ExpressionSyntax initializerExpression, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue)
     {
         valueLiteral = null;
+        stringValue = null;
 
         ArgumentListSyntax? argumentList = initializerExpression switch
         {
@@ -343,6 +349,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         if (!TryFormatLiteral(converted, valueType, out valueLiteral))
             return false;
 
+        stringValue = converted as string;
         return true;
     }
 
@@ -474,6 +481,12 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         string newtonsoftConverterTypeName = enumType.Name + "NewtonsoftJsonConverter";
         string stjReadRawValueCode = BuildReadRawValueCode(valueType);
         string stjWriteValueCode = BuildWriteValueCode(valueType);
+        bool isStringValue = valueType.SpecialType == SpecialType.System_String;
+        bool useValueFrozen = isStringValue && instances.Count > _valueFrozenThreshold;
+        bool useNameFrozen = instances.Count > _nameFrozenThreshold;
+        string valueTryFromSignature = isStringValue ? "string? value" : valueTypeName + " value";
+        List<(string, string Name)> valueItems = instances.Select(static instance => (instance.StringValue ?? string.Empty, instance.Name)).ToList();
+        List<(string, string)> nameItems = instances.Select(static instance => (instance.Name, instance.Name)).ToList();
 
         var source = new StringBuilder();
 
@@ -495,7 +508,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
         if (!hasValueProperty)
         {
-            source.Append("    public ").Append(valueTypeName).AppendLine(" Value { get; }");
+            source.Append("    public readonly ").Append(valueTypeName).AppendLine(" Value;");
             source.AppendLine();
         }
 
@@ -524,7 +537,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         if (emittedValueConstant)
             source.AppendLine();
 
-        source.Append("    private static readonly ").Append(enumTypeName).AppendLine("[] __all = new[]");
+        source.Append("    private static readonly ").Append(enumTypeName).AppendLine("[] __all =");
         source.AppendLine("    {");
 
         for (var i = 0; i < instances.Count; i++)
@@ -534,24 +547,84 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
         source.AppendLine("    };");
         source.AppendLine();
-        source.Append("    public static global::System.Collections.Generic.IReadOnlyList<").Append(enumTypeName).AppendLine("> List => __all;");
-        source.AppendLine();
-        source.Append("    public static bool TryFromValue(").Append(valueTypeName).Append(" value, out ").Append(enumTypeName).AppendLine(" result)");
-        source.AppendLine("    {");
-        source.AppendLine("        switch (value)");
-        source.AppendLine("        {");
 
-        for (var i = 0; i < instances.Count; i++)
+        if (useValueFrozen)
         {
-            source.Append("            case ").Append(instances[i].ValueLiteral).Append(": result = ").Append(instances[i].Name).AppendLine("; return true;");
+            source.Append("    private static readonly global::System.Collections.Frozen.FrozenDictionary<string, ").Append(enumTypeName).AppendLine("> __valueMap =");
+            source.AppendLine("        global::System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary(");
+            source.Append("            new global::System.Collections.Generic.Dictionary<string, ").Append(enumTypeName).Append(">(").Append(instances.Count)
+                .AppendLine(", global::System.StringComparer.Ordinal)");
+            source.AppendLine("            {");
+            for (var i = 0; i < instances.Count; i++)
+            {
+                source.Append("                [").Append(instances[i].ValueLiteral).Append("] = ").Append(instances[i].Name).AppendLine(",");
+            }
+            source.AppendLine("            });");
+            source.AppendLine();
         }
 
-        source.AppendLine("            default:");
-        source.AppendLine("                result = default!;");
-        source.AppendLine("                return false;");
-        source.AppendLine("        }");
+        if (useNameFrozen)
+        {
+            source.Append("    private static readonly global::System.Collections.Frozen.FrozenDictionary<string, ").Append(enumTypeName).AppendLine("> __nameMap =");
+            source.AppendLine("        global::System.Collections.Frozen.FrozenDictionary.ToFrozenDictionary(");
+            source.Append("            new global::System.Collections.Generic.Dictionary<string, ").Append(enumTypeName).Append(">(").Append(instances.Count)
+                .AppendLine(", global::System.StringComparer.Ordinal)");
+            source.AppendLine("            {");
+            for (var i = 0; i < instances.Count; i++)
+            {
+                source.Append("                [\"").Append(instances[i].Name).Append("\"] = ").Append(instances[i].Name).AppendLine(",");
+            }
+            source.AppendLine("            });");
+            source.AppendLine();
+        }
+
+        source.Append("    public static global::System.Collections.Generic.IReadOnlyList<").Append(enumTypeName).AppendLine("> List => __all;");
+        source.AppendLine();
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+        source.Append("    public static bool TryFromValue(").Append(isStringValue ? "string value" : valueTryFromSignature).Append(", out ").Append(enumTypeName).AppendLine(" result)");
+        source.AppendLine("    {");
+        if (isStringValue)
+        {
+            if (useValueFrozen)
+            {
+                source.AppendLine("        if (value is not null && __valueMap.TryGetValue(value, out result))");
+                source.AppendLine("            return true;");
+                source.AppendLine();
+                source.AppendLine("        result = default!;");
+                source.AppendLine("        return false;");
+            }
+            else
+            {
+                AppendStringSwitchBody(source, valueItems, "value", 2);
+            }
+        }
+        else
+        {
+            source.AppendLine("        switch (value)");
+            source.AppendLine("        {");
+            for (var i = 0; i < instances.Count; i++)
+            {
+                source.Append("            case ").Append(instances[i].ValueLiteral).Append(": result = ").Append(instances[i].Name).AppendLine("; return true;");
+            }
+            source.AppendLine("            default:");
+            source.AppendLine("                result = default!;");
+            source.AppendLine("                return false;");
+            source.AppendLine("        }");
+        }
         source.AppendLine("    }");
         source.AppendLine();
+
+        if (isStringValue)
+        {
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.Append("    public static bool TryFromValue(global::System.ReadOnlySpan<char> value, out ").Append(enumTypeName).AppendLine(" result)");
+            source.AppendLine("    {");
+            AppendSpanSwitchBody(source, valueItems, "value", 2);
+            source.AppendLine("    }");
+            source.AppendLine();
+        }
+
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
         source.Append("    public static ").Append(enumTypeName).Append(" FromValue(").Append(valueTypeName).AppendLine(" value)");
         source.AppendLine("    {");
         source.AppendLine("        if (TryFromValue(value, out var result))");
@@ -560,22 +633,25 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.AppendLine("        throw new global::System.ArgumentOutOfRangeException(nameof(value), value, \"Unknown enum value.\");");
         source.AppendLine("    }");
         source.AppendLine();
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
         source.Append("    public static bool TryFromName(string name, out ").Append(enumTypeName).AppendLine(" result)");
         source.AppendLine("    {");
-        source.AppendLine("        switch (name)");
-        source.AppendLine("        {");
-
-        for (var i = 0; i < instances.Count; i++)
+        if (useNameFrozen)
         {
-            source.Append("            case \"").Append(instances[i].Name).Append("\": result = ").Append(instances[i].Name).AppendLine("; return true;");
+            source.AppendLine("        if (name is not null && __nameMap.TryGetValue(name, out result))");
+            source.AppendLine("            return true;");
+            source.AppendLine();
+            source.AppendLine("        result = default!;");
+            source.AppendLine("        return false;");
         }
-
-        source.AppendLine("            default:");
-        source.AppendLine("                result = default!;");
-        source.AppendLine("                return false;");
-        source.AppendLine("        }");
+        else
+        {
+            AppendStringSwitchBody(source, nameItems, "name", 2);
+        }
         source.AppendLine("    }");
         source.AppendLine();
+
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
         source.Append("    public static ").Append(enumTypeName).AppendLine(" FromName(string name)");
         source.AppendLine("    {");
         source.AppendLine("        if (TryFromName(name, out var result))");
@@ -590,10 +666,25 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.Append("    public override ").Append(enumTypeName)
             .AppendLine(" Read(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)");
         source.AppendLine("    {");
-        source.Append(stjReadRawValueCode);
-        source.AppendLine();
-        source.Append("        if (").Append(enumTypeName).AppendLine(".TryFromValue(rawValue, out var result))");
-        source.AppendLine("            return result;");
+        if (isStringValue)
+        {
+            source.AppendLine("        if (reader.TokenType != global::System.Text.Json.JsonTokenType.String)");
+            source.AppendLine("            throw new global::System.Text.Json.JsonException(\"Expected string value.\");");
+            source.AppendLine();
+
+            for (var i = 0; i < instances.Count; i++)
+            {
+                source.Append("        if (reader.ValueTextEquals(").Append(instances[i].ValueLiteral).Append("u8)) return ")
+                    .Append(enumTypeName).Append(".").Append(instances[i].Name).AppendLine(";");
+            }
+        }
+        else
+        {
+            source.Append(stjReadRawValueCode);
+            source.AppendLine();
+            source.Append("        if (").Append(enumTypeName).AppendLine(".TryFromValue(rawValue, out var result))");
+            source.AppendLine("            return result;");
+        }
         source.AppendLine();
         source.AppendLine("        throw new global::System.Text.Json.JsonException(\"Unknown enum value.\");");
         source.AppendLine("    }");
@@ -601,16 +692,6 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.Append("    public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ").Append(enumTypeName)
             .AppendLine(" value, global::System.Text.Json.JsonSerializerOptions options)");
         source.AppendLine("    {");
-
-        if (enumType.IsReferenceType)
-        {
-            source.AppendLine("        if (value is null)");
-            source.AppendLine("        {");
-            source.AppendLine("            writer.WriteNullValue();");
-            source.AppendLine("            return;");
-            source.AppendLine("        }");
-            source.AppendLine();
-        }
 
         source.Append("        ").Append(stjWriteValueCode.Replace("{VALUE_EXPRESSION}", "value.Value")).AppendLine();
         source.AppendLine("    }");
@@ -706,6 +787,289 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 return "        " + typeName + " rawValue = global::System.Text.Json.JsonSerializer.Deserialize<" + typeName +
                        ">(ref reader, options)!;";
             }
+        }
+    }
+
+    private static void AppendStringDecisionTreeBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel,
+        bool writeNoMatchTail = true, int? maxLength = null)
+    {
+        string indent = new(' ', indentLevel * 4);
+        string innerIndent = new(' ', (indentLevel + 1) * 4);
+        string branchIndent = new(' ', (indentLevel + 2) * 4);
+
+        IEnumerable<IGrouping<int, (string Text, string TargetName)>> groups = items
+            .Where(static item => item.Text.Length >= 0)
+            .GroupBy(static item => item.Text.Length)
+            .OrderBy(static group => group.Key);
+
+        if (maxLength.HasValue)
+            groups = groups.Where(group => group.Key <= maxLength.Value);
+
+        source.Append(indent).Append("switch (").Append(inputIdentifier).AppendLine(".Length)");
+        source.Append(indent).AppendLine("{");
+
+        foreach (IGrouping<int, (string Text, string TargetName)> group in groups)
+        {
+            source.Append(innerIndent).Append("case ").Append(group.Key).AppendLine(":");
+
+            if (group.Key == 1)
+            {
+                source.Append(branchIndent).Append("char c0 = ").Append(inputIdentifier).AppendLine("[0];");
+            }
+
+            foreach ((string text, string targetName) in group)
+            {
+                if (group.Key == 0)
+                {
+                    source.Append(branchIndent).Append("result = ").Append(targetName).AppendLine(";");
+                    source.Append(branchIndent).AppendLine("return true;");
+                    continue;
+                }
+
+                source.Append(branchIndent).Append("if (");
+
+                for (var i = 0; i < text.Length; i++)
+                {
+                    if (i > 0)
+                        source.Append(" && ");
+
+                    if (group.Key == 1 && i == 0)
+                        source.Append("c0 == '").Append(EscapeChar(text[i])).Append("'");
+                    else
+                        source.Append(inputIdentifier).Append("[").Append(i).Append("] == '").Append(EscapeChar(text[i])).Append("'");
+                }
+
+                source.AppendLine(")");
+                source.Append(branchIndent).AppendLine("{");
+                source.Append(branchIndent).Append("    result = ").Append(targetName).AppendLine(";");
+                source.Append(branchIndent).AppendLine("    return true;");
+                source.Append(branchIndent).AppendLine("}");
+            }
+
+            source.Append(branchIndent).AppendLine("break;");
+        }
+
+        source.Append(innerIndent).AppendLine("default:");
+        source.Append(branchIndent).AppendLine("break;");
+        source.Append(indent).AppendLine("}");
+
+        if (writeNoMatchTail)
+        {
+            source.AppendLine();
+            source.Append(indent).AppendLine("result = default!;");
+            source.Append(indent).AppendLine("return false;");
+        }
+    }
+
+    private static void AppendStringSwitchBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel)
+    {
+        string indent = new(' ', indentLevel * 4);
+        string innerIndent = new(' ', (indentLevel + 1) * 4);
+
+        source.Append(indent).Append("switch (").Append(inputIdentifier).AppendLine(")");
+        source.Append(indent).AppendLine("{");
+
+        foreach ((string text, string targetName) in items)
+        {
+            source.Append(innerIndent).Append("case \"").Append(EscapeString(text)).Append("\": result = ").Append(targetName).AppendLine("; return true;");
+        }
+
+        source.Append(innerIndent).AppendLine("default:");
+        source.Append(innerIndent).AppendLine("    result = default!;");
+        source.Append(innerIndent).AppendLine("    return false;");
+        source.Append(indent).AppendLine("}");
+    }
+
+    private static void AppendSpanSwitchBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel)
+    {
+        string indent = new(' ', indentLevel * 4);
+        string innerIndent = new(' ', (indentLevel + 1) * 4);
+
+        source.Append(indent).Append("switch (").Append(inputIdentifier).AppendLine(")");
+        source.Append(indent).AppendLine("{");
+
+        foreach ((string text, string targetName) in items)
+        {
+            source.Append(innerIndent).Append("case \"").Append(EscapeString(text)).Append("\": result = ").Append(targetName).AppendLine("; return true;");
+        }
+
+        source.Append(innerIndent).AppendLine("default:");
+        source.Append(innerIndent).AppendLine("    result = default!;");
+        source.Append(innerIndent).AppendLine("    return false;");
+        source.Append(indent).AppendLine("}");
+    }
+
+    private static void AppendStringFirstCharSwitchBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel,
+        bool writeNoMatchTail = true, int? maxLength = null, string? lengthExpression = null)
+    {
+        string indent = new(' ', indentLevel * 4);
+        string innerIndent = new(' ', (indentLevel + 1) * 4);
+        string branchIndent = new(' ', (indentLevel + 2) * 4);
+        string leafIndent = new(' ', (indentLevel + 3) * 4);
+        string lenExpression = lengthExpression ?? inputIdentifier + ".Length";
+
+        IEnumerable<IGrouping<int, (string Text, string TargetName)>> lengthGroups = items
+            .GroupBy(static item => item.Text.Length)
+            .OrderBy(static group => group.Key);
+
+        if (maxLength.HasValue)
+            lengthGroups = lengthGroups.Where(group => group.Key <= maxLength.Value);
+
+        source.Append(indent).Append("switch (").Append(lenExpression).AppendLine(")");
+        source.Append(indent).AppendLine("{");
+
+        foreach (IGrouping<int, (string Text, string TargetName)> lengthGroup in lengthGroups)
+        {
+            source.Append(innerIndent).Append("case ").Append(lengthGroup.Key).AppendLine(":");
+            List<(string Text, string TargetName)> lengthCandidates = lengthGroup.ToList();
+
+            if (lengthCandidates.Count == 1)
+            {
+                (string text, string targetName) = lengthCandidates[0];
+                source.Append(branchIndent).Append("if (").Append(inputIdentifier).Append(" == \"").Append(EscapeString(text)).AppendLine("\")");
+                source.Append(branchIndent).AppendLine("{");
+                source.Append(branchIndent).Append("    result = ").Append(targetName).AppendLine(";");
+                source.Append(branchIndent).AppendLine("    return true;");
+                source.Append(branchIndent).AppendLine("}");
+                source.Append(branchIndent).AppendLine("break;");
+                continue;
+            }
+
+            source.Append(branchIndent).Append("switch (").Append(inputIdentifier).AppendLine("[0])");
+            source.Append(branchIndent).AppendLine("{");
+
+            IEnumerable<IGrouping<char, (string Text, string TargetName)>> firstCharGroups = lengthGroup
+                .GroupBy(static item => item.Text[0])
+                .OrderBy(static group => group.Key);
+
+            foreach (IGrouping<char, (string Text, string TargetName)> firstCharGroup in firstCharGroups)
+            {
+                source.Append(leafIndent).Append("case '").Append(EscapeChar(firstCharGroup.Key)).AppendLine("':");
+
+                if (lengthGroup.Key == 1)
+                {
+                    (_, string targetName) = firstCharGroup.First();
+                    source.Append(leafIndent).Append("    result = ").Append(targetName).AppendLine(";");
+                    source.Append(leafIndent).AppendLine("    return true;");
+                }
+                else
+                {
+                    foreach ((string text, string targetName) in firstCharGroup)
+                    {
+                        source.Append(leafIndent).Append("    if (").Append(inputIdentifier).Append(" == \"").Append(EscapeString(text)).AppendLine("\")");
+                        source.Append(leafIndent).Append("    {");
+                        source.AppendLine();
+                        source.Append(leafIndent).Append("        result = ").Append(targetName).AppendLine(";");
+                        source.Append(leafIndent).AppendLine("        return true;");
+                        source.Append(leafIndent).AppendLine("    }");
+                    }
+                    source.Append(leafIndent).AppendLine("    break;");
+                }
+            }
+
+            source.Append(leafIndent).AppendLine("default:");
+            source.Append(leafIndent).AppendLine("    break;");
+            source.Append(branchIndent).AppendLine("}");
+            source.Append(branchIndent).AppendLine("break;");
+        }
+
+        source.Append(innerIndent).AppendLine("default:");
+        source.Append(branchIndent).AppendLine("break;");
+        source.Append(indent).AppendLine("}");
+
+        if (writeNoMatchTail)
+        {
+            source.AppendLine();
+            source.Append(indent).AppendLine("result = default!;");
+            source.Append(indent).AppendLine("return false;");
+        }
+    }
+
+    private static void AppendSpanFirstCharSwitchBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel,
+        bool writeNoMatchTail = true, int? maxLength = null, string? lengthExpression = null)
+    {
+        string indent = new(' ', indentLevel * 4);
+        string innerIndent = new(' ', (indentLevel + 1) * 4);
+        string branchIndent = new(' ', (indentLevel + 2) * 4);
+        string leafIndent = new(' ', (indentLevel + 3) * 4);
+        string lenExpression = lengthExpression ?? inputIdentifier + ".Length";
+
+        IEnumerable<IGrouping<int, (string Text, string TargetName)>> lengthGroups = items
+            .GroupBy(static item => item.Text.Length)
+            .OrderBy(static group => group.Key);
+
+        if (maxLength.HasValue)
+            lengthGroups = lengthGroups.Where(group => group.Key <= maxLength.Value);
+
+        source.Append(indent).Append("switch (").Append(lenExpression).AppendLine(")");
+        source.Append(indent).AppendLine("{");
+
+        foreach (IGrouping<int, (string Text, string TargetName)> lengthGroup in lengthGroups)
+        {
+            source.Append(innerIndent).Append("case ").Append(lengthGroup.Key).AppendLine(":");
+            List<(string Text, string TargetName)> lengthCandidates = lengthGroup.ToList();
+
+            if (lengthCandidates.Count == 1)
+            {
+                (string text, string targetName) = lengthCandidates[0];
+                source.Append(branchIndent).Append("if (global::System.MemoryExtensions.SequenceEqual(").Append(inputIdentifier)
+                    .Append(", global::System.MemoryExtensions.AsSpan(\"").Append(EscapeString(text)).AppendLine("\")))");
+                source.Append(branchIndent).AppendLine("{");
+                source.Append(branchIndent).Append("    result = ").Append(targetName).AppendLine(";");
+                source.Append(branchIndent).AppendLine("    return true;");
+                source.Append(branchIndent).AppendLine("}");
+                source.Append(branchIndent).AppendLine("break;");
+                continue;
+            }
+
+            source.Append(branchIndent).Append("switch (").Append(inputIdentifier).AppendLine("[0])");
+            source.Append(branchIndent).AppendLine("{");
+
+            IEnumerable<IGrouping<char, (string Text, string TargetName)>> firstCharGroups = lengthGroup
+                .GroupBy(static item => item.Text[0])
+                .OrderBy(static group => group.Key);
+
+            foreach (IGrouping<char, (string Text, string TargetName)> firstCharGroup in firstCharGroups)
+            {
+                source.Append(leafIndent).Append("case '").Append(EscapeChar(firstCharGroup.Key)).AppendLine("':");
+
+                if (lengthGroup.Key == 1)
+                {
+                    (_, string targetName) = firstCharGroup.First();
+                    source.Append(leafIndent).Append("    result = ").Append(targetName).AppendLine(";");
+                    source.Append(leafIndent).AppendLine("    return true;");
+                }
+                else
+                {
+                    foreach ((string text, string targetName) in firstCharGroup)
+                    {
+                        source.Append(leafIndent).Append("    if (global::System.MemoryExtensions.SequenceEqual(").Append(inputIdentifier)
+                            .Append(", global::System.MemoryExtensions.AsSpan(\"").Append(EscapeString(text)).AppendLine("\")))");
+                        source.Append(leafIndent).Append("    {");
+                        source.AppendLine();
+                        source.Append(leafIndent).Append("        result = ").Append(targetName).AppendLine(";");
+                        source.Append(leafIndent).AppendLine("        return true;");
+                        source.Append(leafIndent).AppendLine("    }");
+                    }
+                    source.Append(leafIndent).AppendLine("    break;");
+                }
+            }
+
+            source.Append(leafIndent).AppendLine("default:");
+            source.Append(leafIndent).AppendLine("    break;");
+            source.Append(branchIndent).AppendLine("}");
+            source.Append(branchIndent).AppendLine("break;");
+        }
+
+        source.Append(innerIndent).AppendLine("default:");
+        source.Append(branchIndent).AppendLine("break;");
+        source.Append(indent).AppendLine("}");
+
+        if (writeNoMatchTail)
+        {
+            source.AppendLine();
+            source.Append(indent).AppendLine("result = default!;");
+            source.Append(indent).AppendLine("return false;");
         }
     }
 

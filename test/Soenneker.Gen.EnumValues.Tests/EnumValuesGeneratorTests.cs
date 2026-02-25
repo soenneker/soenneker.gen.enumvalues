@@ -31,6 +31,8 @@ public sealed class EnumValuesGeneratorTests
     {
         ColorCode.TryFromValue("R", out ColorCode? red).Should().BeTrue();
         red.Should().BeSameAs(ColorCode.Red);
+        ColorCode.TryFromValue("R".AsSpan(), out ColorCode? redFromSpan).Should().BeTrue();
+        redFromSpan.Should().BeSameAs(ColorCode.Red);
 
         ColorCode blue = ColorCode.FromName("Blue");
         blue.Should().BeSameAs(ColorCode.Blue);
@@ -87,6 +89,8 @@ public sealed class EnumValuesGeneratorTests
     {
         SizeCode.TryFromValue("S", out SizeCode small).Should().BeTrue();
         small.Should().Be(SizeCode.Small);
+        SizeCode.TryFromValue("S".AsSpan(), out SizeCode smallFromSpan).Should().BeTrue();
+        smallFromSpan.Should().Be(SizeCode.Small);
 
         SizeCode large = SizeCode.FromName("Large");
         large.Should().Be(SizeCode.Large);
