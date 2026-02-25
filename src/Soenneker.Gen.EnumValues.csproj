@@ -18,7 +18,7 @@
         <Version Condition="'$(BUILD_VERSION)' != ''">$(BUILD_VERSION)</Version>
         <AssemblyName>Soenneker.Gen.EnumValues</AssemblyName>
         <PackageId>Soenneker.Gen.EnumValues</PackageId>
-        <PackageTags>gen enumvalues microsoft agent framework agents aiagent google enumvaluesgenerator util csharp dotnet c# .net</PackageTags>
+        <PackageTags>gen enumvalues enums enumvalue enumvaluesgenerator util csharp dotnet c# .net</PackageTags>
         <Copyright>Copyright © 2026 Jake Soenneker</Copyright>
         <Authors>Jake Soenneker</Authors>
         <Company>https://soenneker.com</Company>
