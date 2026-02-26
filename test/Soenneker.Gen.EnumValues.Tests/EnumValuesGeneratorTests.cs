@@ -245,4 +245,154 @@ public sealed class EnumValuesGeneratorTests
         nameof(PriorityLevel.Low).Should().Be(PriorityLevel.Low.Name);
         nameof(PriorityLevel.High).Should().Be(PriorityLevel.High.Name);
     }
+
+    // --- EnumValue<string>: implicit conversion and string equality ---
+
+    [Fact]
+    public void String_enum_implicit_conversion_to_string_works()
+    {
+        string red = ColorCode.Red;
+        red.Should().Be("R");
+
+        string blue = ColorCode.Blue;
+        blue.Should().Be("B");
+    }
+
+    [Fact]
+    public void String_Equals_accepts_enum_via_implicit_conversion()
+    {
+        string.Equals("R", ColorCode.Red, StringComparison.Ordinal).Should().BeTrue();
+        string.Equals("R", ColorCode.Red, StringComparison.OrdinalIgnoreCase).Should().BeTrue();
+        string.Equals("r", ColorCode.Red, StringComparison.OrdinalIgnoreCase).Should().BeTrue();
+        string.Equals("B", ColorCode.Red, StringComparison.Ordinal).Should().BeFalse();
+    }
+
+    [Fact]
+    public void String_enum_equality_with_string_both_directions()
+    {
+        (ColorCode.Red == "R").Should().BeTrue();
+        (ColorCode.Red != "R").Should().BeFalse();
+        (ColorCode.Red == "B").Should().BeFalse();
+        (ColorCode.Red != "B").Should().BeTrue();
+
+        ("R" == ColorCode.Red).Should().BeTrue();
+        ("R" != ColorCode.Red).Should().BeFalse();
+        ("B" == ColorCode.Red).Should().BeFalse();
+        ("B" != ColorCode.Red).Should().BeTrue();
+    }
+
+    [Fact]
+    public void String_enum_equality_with_null_string()
+    {
+        string? n = null;
+        (ColorCode.Red == n).Should().BeFalse();
+        (n == ColorCode.Red).Should().BeFalse();
+        (ColorCode.Red != n).Should().BeTrue();
+        (n != ColorCode.Red).Should().BeTrue();
+    }
+
+    [Fact]
+    public void String_enum_Equals_and_GetHashCode_by_value()
+    {
+        ColorCode red1 = ColorCode.FromValue("R");
+        ColorCode red2 = ColorCode.Red;
+        red1.Should().Be(red2);
+        red1.GetHashCode().Should().Be(red2.GetHashCode());
+        red1.Equals((object)red2).Should().BeTrue();
+    }
+
+    // --- EnumValue<int>: IEquatable, ==/!= with int, ToString, explicit conversion ---
+
+    [Fact]
+    public void Int_enum_implements_IEquatable_TSelf_class()
+    {
+        OrderStatus pending = OrderStatus.Pending;
+        OrderStatus completed = OrderStatus.Completed;
+        pending.Equals(OrderStatus.Pending).Should().BeTrue();
+        pending.Equals(OrderStatus.Completed).Should().BeFalse();
+        completed.Equals(OrderStatus.Completed).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Int_enum_implements_IEquatable_TSelf_struct()
+    {
+        PriorityLevel low = PriorityLevel.Low;
+        PriorityLevel high = PriorityLevel.High;
+        low.Equals(PriorityLevel.Low).Should().BeTrue();
+        low.Equals(PriorityLevel.High).Should().BeFalse();
+        high.Equals(PriorityLevel.High).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Int_enum_implements_IEquatable_int()
+    {
+        OrderStatus.Pending.Equals(1).Should().BeTrue();
+        OrderStatus.Pending.Equals(2).Should().BeFalse();
+        OrderStatus.Completed.Equals(2).Should().BeTrue();
+
+        PriorityLevel.Low.Equals(0).Should().BeTrue();
+        PriorityLevel.Low.Equals(1).Should().BeFalse();
+        PriorityLevel.High.Equals(1).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Int_enum_equality_TSelf_TSelf()
+    {
+        OrderStatus pending = OrderStatus.Pending;
+        OrderStatus completed = OrderStatus.Completed;
+        (pending == OrderStatus.Pending).Should().BeTrue();
+        (pending != completed).Should().BeTrue();
+        (pending == completed).Should().BeFalse();
+
+        PriorityLevel low = PriorityLevel.Low;
+        PriorityLevel high = PriorityLevel.High;
+        (low == PriorityLevel.Low).Should().BeTrue();
+        (low != high).Should().BeTrue();
+        (low == high).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Int_enum_equality_TSelf_int_both_directions()
+    {
+        (OrderStatus.Pending == 1).Should().BeTrue();
+        (OrderStatus.Pending != 1).Should().BeFalse();
+        (OrderStatus.Pending == 2).Should().BeFalse();
+        (1 == OrderStatus.Pending).Should().BeTrue();
+        (2 != OrderStatus.Pending).Should().BeTrue();
+
+        (PriorityLevel.Low == 0).Should().BeTrue();
+        (PriorityLevel.High == 1).Should().BeTrue();
+        (0 == PriorityLevel.Low).Should().BeTrue();
+        (1 == PriorityLevel.High).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Int_enum_ToString_uses_invariant_culture()
+    {
+        OrderStatus.Pending.ToString().Should().Be("1");
+        OrderStatus.Completed.ToString().Should().Be("2");
+        PriorityLevel.Low.ToString().Should().Be("0");
+        PriorityLevel.High.ToString().Should().Be("1");
+    }
+
+    [Fact]
+    public void Int_enum_explicit_conversion_to_int()
+    {
+        ((int)OrderStatus.Pending).Should().Be(1);
+        ((int)OrderStatus.Completed).Should().Be(2);
+        ((int)PriorityLevel.Low).Should().Be(0);
+        ((int)PriorityLevel.High).Should().Be(1);
+    }
+
+    [Fact]
+    public void Int_enum_override_Equals_object_and_GetHashCode()
+    {
+        OrderStatus pending = OrderStatus.FromValue(1);
+        pending.Equals((object)OrderStatus.Pending).Should().BeTrue();
+        pending.GetHashCode().Should().Be(OrderStatus.Pending.GetHashCode());
+
+        PriorityLevel low = PriorityLevel.FromValue(0);
+        low.Equals((object)PriorityLevel.Low).Should().BeTrue();
+        low.GetHashCode().Should().Be(PriorityLevel.Low.GetHashCode());
+    }
 }

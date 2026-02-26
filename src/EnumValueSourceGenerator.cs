@@ -548,7 +548,10 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.Append("[global::System.Text.Json.Serialization.JsonConverter(typeof(").Append(stjConverterTypeName).AppendLine("))]");
         if (supportsNewtonsoft)
             source.Append("[global::Newtonsoft.Json.JsonConverter(typeof(").Append(newtonsoftConverterTypeName).AppendLine("))]");
-        source.Append(kind == "class" ? "public sealed partial class " : "public partial struct ").Append(enumType.Name).AppendLine();
+        source.Append(kind == "class" ? "public sealed partial class " : "public partial struct ").Append(enumType.Name);
+        if (!isStringValue)
+            source.Append(" : global::System.IEquatable<").Append(enumTypeName).Append(">, global::System.IEquatable<").Append(valueTypeName).Append(">");
+        source.AppendLine();
         source.AppendLine("{");
 
         if (!hasValueProperty)
@@ -779,6 +782,80 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.AppendLine();
         source.AppendLine("        return ThrowHelper.UnknownName(name);");
         source.AppendLine("    }");
+        source.AppendLine();
+
+        if (isStringValue)
+        {
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.Append("    public static implicit operator string(").Append(enumTypeName).AppendLine(" value)");
+            source.AppendLine("        => value.Value;");
+            source.AppendLine();
+            source.AppendLine("    public override bool Equals(object? obj)");
+            source.Append("        => obj is ").Append(enumTypeName).AppendLine(" other && global::System.String.Equals(Value, other.Value, global::System.StringComparison.Ordinal);");
+            source.AppendLine();
+            source.AppendLine("    public override int GetHashCode()");
+            source.AppendLine("        => Value is { } v ? global::System.StringComparer.Ordinal.GetHashCode(v) : 0;");
+            source.AppendLine();
+            source.Append("    public static bool operator ==(").Append(enumTypeName).AppendLine(" left, string? right)");
+            source.AppendLine("        => global::System.String.Equals(left.Value, right, global::System.StringComparison.Ordinal);");
+            source.AppendLine();
+            source.Append("    public static bool operator !=(").Append(enumTypeName).Append(" left, string? right)");
+            source.AppendLine("        => !global::System.String.Equals(left.Value, right, global::System.StringComparison.Ordinal);");
+            source.AppendLine();
+            source.Append("    public static bool operator ==(string? left, ").Append(enumTypeName).AppendLine(" right)");
+            source.AppendLine("        => global::System.String.Equals(left, right.Value, global::System.StringComparison.Ordinal);");
+            source.AppendLine();
+            source.Append("    public static bool operator !=(string? left, ").Append(enumTypeName).Append(" right)");
+            source.AppendLine("        => !global::System.String.Equals(left, right.Value, global::System.StringComparison.Ordinal);");
+            source.AppendLine();
+        }
+        else
+        {
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.Append("    public bool Equals(").Append(enumTypeName).Append(enumType.IsReferenceType ? "? " : " ");
+            source.Append("other)");
+            if (enumType.IsReferenceType)
+                source.AppendLine(" => other is not null && Value.Equals(other.Value);");
+            else
+                source.AppendLine(" => Value.Equals(other.Value);");
+            source.AppendLine();
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.Append("    public bool Equals(").Append(valueTypeName).AppendLine(" other)");
+            source.AppendLine("        => Value.Equals(other);");
+            source.AppendLine();
+            source.AppendLine("    public override bool Equals(object? obj)");
+            source.Append("        => obj is ").Append(enumTypeName).AppendLine(" other && Equals(other);");
+            source.AppendLine();
+            source.AppendLine("    public override int GetHashCode()");
+            source.AppendLine("        => Value.GetHashCode();");
+            source.AppendLine();
+            source.Append("    public static bool operator ==(").Append(enumTypeName).Append(" left, ").Append(enumTypeName).AppendLine(" right)");
+            source.AppendLine("        => left.Equals(right);");
+            source.AppendLine();
+            source.Append("    public static bool operator !=(").Append(enumTypeName).Append(" left, ").Append(enumTypeName).AppendLine(" right)");
+            source.AppendLine("        => !left.Equals(right);");
+            source.AppendLine();
+            source.Append("    public static bool operator ==(").Append(enumTypeName).Append(" left, ").Append(valueTypeName).AppendLine(" right)");
+            source.AppendLine("        => left.Value.Equals(right);");
+            source.AppendLine();
+            source.Append("    public static bool operator !=(").Append(enumTypeName).Append(" left, ").Append(valueTypeName).AppendLine(" right)");
+            source.AppendLine("        => !left.Value.Equals(right);");
+            source.AppendLine();
+            source.Append("    public static bool operator ==(").Append(valueTypeName).Append(" left, ").Append(enumTypeName).AppendLine(" right)");
+            source.AppendLine("        => right.Value.Equals(left);");
+            source.AppendLine();
+            source.Append("    public static bool operator !=(").Append(valueTypeName).Append(" left, ").Append(enumTypeName).AppendLine(" right)");
+            source.AppendLine("        => !right.Value.Equals(left);");
+            source.AppendLine();
+            source.AppendLine("    public override string ToString()");
+            source.Append("        => ").Append(BuildToStringExpression(valueType)).AppendLine(";");
+            source.AppendLine();
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.Append("    public static explicit operator ").Append(valueTypeName).Append("(").Append(enumTypeName).AppendLine(" value)");
+            source.AppendLine("        => value.Value;");
+            source.AppendLine();
+        }
+
         source.AppendLine("}");
         source.AppendLine();
         source.AppendLine("file static class ThrowHelper");
@@ -1243,6 +1320,14 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 return "serializer.Serialize(writer, " + "{VALUE_EXPRESSION}" + ");";
             }
         }
+    }
+
+    private static string BuildToStringExpression(ITypeSymbol valueType)
+    {
+        // Guid and other non-primitives typically don't have ToString(IFormatProvider)
+        if (valueType.ToDisplayString() == "System.Guid")
+            return "Value.ToString()";
+        return "Value.ToString(global::System.Globalization.CultureInfo.InvariantCulture)!";
     }
 
     private static bool CanEmitConstant(ITypeSymbol valueType)
