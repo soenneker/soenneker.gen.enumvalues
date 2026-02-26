@@ -16,6 +16,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 {
     private const int _valueFrozenThreshold = 128;
     private const int _nameFrozenThreshold = 256;
+    private const int _spanLengthCharThreshold = 24;
 
     private static readonly DiagnosticDescriptor _typeMustBePartialDescriptor = new(
         id: "SEV001",
@@ -53,6 +54,14 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         id: "SEV005",
         title: "Duplicate enum value detected",
         messageFormat: "Type '{0}' has duplicate enum value '{1}'",
+        category: "EnumValueGenerator",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor _ordinalNotAllowedDescriptor = new(
+        id: "SEV006",
+        title: "Ordinal argument not allowed",
+        messageFormat: "Do not specify an ordinal; use new(\"{0}\") not new(\"{0}\", id). Ordinals are assigned automatically by the generator.",
         category: "EnumValueGenerator",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -154,7 +163,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             return;
         }
 
-        List<EnumInstance> instances = GatherInstances(compilation, enumType, valueType);
+        List<EnumInstance> instances = GatherInstances(context, compilation, enumType, valueType);
 
         if (instances.Count == 0)
         {
@@ -175,9 +184,10 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
         bool hasValueProperty = HasValueProperty(enumType, valueType);
         bool hasValueConstructor = HasValueConstructor(enumType, valueType);
+        bool hasNameProperty = HasNameProperty(enumType);
 
         bool supportsNewtonsoft = SupportsNewtonsoft(compilation);
-        string source = BuildSource(enumType, valueType, instances, hasValueProperty, hasValueConstructor, supportsNewtonsoft);
+        string source = BuildSource(enumType, valueType, instances, hasValueProperty, hasValueConstructor, hasNameProperty, supportsNewtonsoft);
         context.AddSource($"{enumType.Name}.EnumValues.g.cs", SourceText.From(source, Encoding.UTF8));
     }
 
@@ -234,7 +244,20 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         return false;
     }
 
-    private static List<EnumInstance> GatherInstances(Compilation compilation, INamedTypeSymbol enumType, INamedTypeSymbol valueType)
+    private static bool HasNameProperty(INamedTypeSymbol enumType)
+    {
+        foreach (ISymbol member in enumType.GetMembers("Name"))
+        {
+            if (member is IPropertySymbol propertySymbol && !propertySymbol.IsStatic && !propertySymbol.IsIndexer)
+                return true;
+            if (member is IFieldSymbol fieldSymbol && !fieldSymbol.IsStatic)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static List<EnumInstance> GatherInstances(SourceProductionContext context, Compilation compilation, INamedTypeSymbol enumType, INamedTypeSymbol valueType)
     {
         var result = new List<EnumInstance>();
 
@@ -245,9 +268,11 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 if (!fieldSymbol.IsStatic || !SymbolEqualityComparer.Default.Equals(fieldSymbol.Type, enumType))
                     continue;
 
-                if (TryGetValueLiteralFromField(compilation, fieldSymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location))
+                if (TryGetValueLiteralFromField(compilation, fieldSymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation))
                 {
-                    result.Add(new EnumInstance(fieldSymbol.Name, valueLiteral!, stringValue, location ?? fieldSymbol.Locations.FirstOrDefault() ?? Location.None));
+                    if (ordinalErrorLocation is not null)
+                        context.ReportDiagnostic(Diagnostic.Create(_ordinalNotAllowedDescriptor, ordinalErrorLocation, stringValue ?? valueLiteral ?? ""));
+                    result.Add(new EnumInstance(fieldSymbol.Name, valueLiteral!, stringValue, location ?? fieldSymbol.Locations.FirstOrDefault() ?? Location.None, id));
                 }
             }
             else if (member is IPropertySymbol propertySymbol)
@@ -255,9 +280,11 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 if (!propertySymbol.IsStatic || !SymbolEqualityComparer.Default.Equals(propertySymbol.Type, enumType))
                     continue;
 
-                if (TryGetValueLiteralFromProperty(compilation, propertySymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location))
+                if (TryGetValueLiteralFromProperty(compilation, propertySymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation))
                 {
-                    result.Add(new EnumInstance(propertySymbol.Name, valueLiteral!, stringValue, location ?? propertySymbol.Locations.FirstOrDefault() ?? Location.None));
+                    if (ordinalErrorLocation is not null)
+                        context.ReportDiagnostic(Diagnostic.Create(_ordinalNotAllowedDescriptor, ordinalErrorLocation, stringValue ?? valueLiteral ?? ""));
+                    result.Add(new EnumInstance(propertySymbol.Name, valueLiteral!, stringValue, location ?? propertySymbol.Locations.FirstOrDefault() ?? Location.None, id));
                 }
             }
         }
@@ -267,11 +294,13 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         return result;
     }
 
-    private static bool TryGetValueLiteralFromField(Compilation compilation, IFieldSymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location)
+    private static bool TryGetValueLiteralFromField(Compilation compilation, IFieldSymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation)
     {
         valueLiteral = null;
         stringValue = null;
         location = null;
+        id = null;
+        ordinalErrorLocation = null;
 
         foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
         {
@@ -284,9 +313,11 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
             SemanticModel semanticModel = compilation.GetSemanticModel(initializer.SyntaxTree);
 
-            if (TryGetValueLiteralFromInitializer(semanticModel, initializer.Value, valueType, out valueLiteral, out stringValue))
+            if (TryGetValueLiteralFromInitializer(semanticModel, initializer.Value, valueType, out valueLiteral, out stringValue, out id, out bool hasExplicitOrdinal))
             {
                 location = initializer.GetLocation();
+                if (hasExplicitOrdinal)
+                    ordinalErrorLocation = initializer.GetLocation();
                 return true;
             }
         }
@@ -294,11 +325,13 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         return false;
     }
 
-    private static bool TryGetValueLiteralFromProperty(Compilation compilation, IPropertySymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location)
+    private static bool TryGetValueLiteralFromProperty(Compilation compilation, IPropertySymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation)
     {
         valueLiteral = null;
         stringValue = null;
         location = null;
+        id = null;
+        ordinalErrorLocation = null;
 
         foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
         {
@@ -312,9 +345,11 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
             SemanticModel semanticModel = compilation.GetSemanticModel(expression.SyntaxTree);
 
-            if (TryGetValueLiteralFromInitializer(semanticModel, expression, valueType, out valueLiteral, out stringValue))
+            if (TryGetValueLiteralFromInitializer(semanticModel, expression, valueType, out valueLiteral, out stringValue, out id, out bool hasExplicitOrdinal))
             {
                 location = expression.GetLocation();
+                if (hasExplicitOrdinal)
+                    ordinalErrorLocation = expression.GetLocation();
                 return true;
             }
         }
@@ -322,10 +357,12 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         return false;
     }
 
-    private static bool TryGetValueLiteralFromInitializer(SemanticModel semanticModel, ExpressionSyntax initializerExpression, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue)
+    private static bool TryGetValueLiteralFromInitializer(SemanticModel semanticModel, ExpressionSyntax initializerExpression, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out byte? id, out bool hasExplicitOrdinal)
     {
         valueLiteral = null;
         stringValue = null;
+        id = null;
+        hasExplicitOrdinal = false;
 
         ArgumentListSyntax? argumentList = initializerExpression switch
         {
@@ -336,6 +373,9 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
         if (argumentList is null || argumentList.Arguments.Count == 0)
             return false;
+
+        if (argumentList.Arguments.Count >= 2)
+            hasExplicitOrdinal = true;
 
         ExpressionSyntax valueExpression = argumentList.Arguments[0].Expression;
         Optional<object?> constant = semanticModel.GetConstantValue(valueExpression);
@@ -468,7 +508,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         }
     }
 
-    private static string BuildSource(INamedTypeSymbol enumType, INamedTypeSymbol valueType, List<EnumInstance> instances, bool hasValueProperty, bool hasValueConstructor, bool supportsNewtonsoft)
+    private static string BuildSource(INamedTypeSymbol enumType, INamedTypeSymbol valueType, List<EnumInstance> instances, bool hasValueProperty, bool hasValueConstructor, bool hasNameProperty, bool supportsNewtonsoft)
     {
         string enumTypeName = enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         string valueTypeName = valueType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -484,9 +524,16 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         bool isStringValue = valueType.SpecialType == SpecialType.System_String;
         bool useValueFrozen = isStringValue && instances.Count > _valueFrozenThreshold;
         bool useNameFrozen = instances.Count > _nameFrozenThreshold;
+        bool useOrdinalName = !hasValueConstructor && !hasNameProperty && instances.Count > 0 && instances.Count <= 256;
         string valueTryFromSignature = isStringValue ? "string? value" : valueTypeName + " value";
-        List<(string, string Name)> valueItems = instances.Select(static instance => (instance.StringValue ?? string.Empty, instance.Name)).ToList();
-        List<(string, string)> nameItems = instances.Select(static instance => (instance.Name, instance.Name)).ToList();
+        List<(string ConstantName, string TargetName)> valueItems = isStringValue
+            ? instances.Select(static instance => (instance.Name + "Value", instance.Name)).ToList()
+            : instances.Select(static instance => (instance.StringValue ?? string.Empty, instance.Name)).ToList();
+        List<(string ConstantName, string TargetName)> nameItems = instances.Select(static instance => (instance.Name + "Name", instance.Name)).ToList();
+        List<(string Text, string TargetName)> nameItemsWithText = instances.Select(static instance => (instance.Name, instance.Name)).ToList();
+        List<(string Text, string TargetName)> valueItemsWithText = isStringValue
+            ? instances.Select(static instance => (instance.StringValue ?? "", instance.Name)).ToList()
+            : new List<(string Text, string TargetName)>();
 
         var source = new StringBuilder();
 
@@ -503,21 +550,76 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.Append("[global::System.Text.Json.Serialization.JsonConverter(typeof(").Append(stjConverterTypeName).AppendLine("))]");
         if (supportsNewtonsoft)
             source.Append("[global::Newtonsoft.Json.JsonConverter(typeof(").Append(newtonsoftConverterTypeName).AppendLine("))]");
-        source.Append("public partial ").Append(kind).Append(" ").Append(enumType.Name).AppendLine();
+        source.Append(kind == "class" ? "public sealed partial class " : "public partial struct ").Append(enumType.Name).AppendLine();
         source.AppendLine("{");
 
         if (!hasValueProperty)
         {
-            source.Append("    public readonly ").Append(valueTypeName).AppendLine(" Value;");
+            source.Append("    public ").Append(valueTypeName).AppendLine(" Value { get; }");
+            source.AppendLine();
+        }
+
+        if (useOrdinalName)
+        {
+            source.AppendLine("    private readonly byte _id;");
             source.AppendLine();
         }
 
         if (!hasValueConstructor)
         {
-            source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).AppendLine(" value)");
-            source.AppendLine("    {");
-            source.AppendLine("        Value = value;");
-            source.AppendLine("    }");
+            if (useOrdinalName)
+            {
+                source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value, byte id)");
+                source.AppendLine();
+                source.AppendLine("    {");
+                source.AppendLine("        Value = value;");
+                source.AppendLine("        _id = id;");
+                source.AppendLine("    }");
+                source.AppendLine();
+                source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value) : this(value, 255)");
+                source.AppendLine();
+                source.AppendLine("    {");
+                source.AppendLine("    }");
+            }
+            else
+            {
+                source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value) => Value = value;");
+                source.AppendLine();
+            }
+            source.AppendLine();
+        }
+
+        if (!hasNameProperty)
+        {
+            if (useOrdinalName)
+            {
+                source.AppendLine("    public string Name => _id switch");
+                source.AppendLine("    {");
+                for (var i = 0; i < instances.Count; i++)
+                {
+                    source.Append("        ").Append(i.ToString(CultureInfo.InvariantCulture)).Append(" => \"").Append(EscapeString(instances[i].Name)).AppendLine("\",");
+                }
+                source.AppendLine("        _ => \"\"");
+                source.AppendLine("    };");
+            }
+            else
+            {
+                source.AppendLine("    public string Name");
+                source.Append("        => ");
+                for (var i = 0; i < instances.Count; i++)
+                {
+                    if (i > 0)
+                        source.Append("     : ");
+                    string condition = enumType.IsReferenceType
+                        ? "global::System.Object.ReferenceEquals(this, " + instances[i].Name + ")"
+                        : "global::System.Collections.Generic.EqualityComparer<" + enumTypeName + ">.Default.Equals(this, " + instances[i].Name + ")";
+                    source.Append(condition).Append(" ? \"").Append(EscapeString(instances[i].Name)).Append("\"");
+                    if (i < instances.Count - 1)
+                        source.AppendLine();
+                }
+                source.AppendLine();
+                source.AppendLine("     : \"\";");
+            }
             source.AppendLine();
         }
 
@@ -537,15 +639,54 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         if (emittedValueConstant)
             source.AppendLine();
 
-        source.Append("    private static readonly ").Append(enumTypeName).AppendLine("[] __all =");
-        source.AppendLine("    {");
-
-        for (var i = 0; i < instances.Count; i++)
+        bool emittedNameConstant = false;
+        if (!useNameFrozen && instances.Count > 0)
         {
-            source.Append("        ").Append(instances[i].Name).AppendLine(",");
+            for (var i = 0; i < instances.Count; i++)
+            {
+                string nameFieldName = instances[i].Name + "Name";
+                if (enumType.GetMembers(nameFieldName).Length > 0)
+                    continue;
+                emittedNameConstant = true;
+                source.Append("    private const string ").Append(nameFieldName).Append(" = \"").Append(EscapeString(instances[i].Name)).AppendLine("\";");
+            }
+            if (emittedNameConstant)
+                source.AppendLine();
         }
 
-        source.AppendLine("    };");
+        if (useOrdinalName)
+        {
+            source.Append("    static ").Append(enumType.Name).AppendLine("()");
+            source.AppendLine("    {");
+            for (var i = 0; i < instances.Count; i++)
+            {
+                string valueFieldName = instances[i].Name + "Value";
+                string valueArg = canEmitConstant ? valueFieldName : instances[i].ValueLiteral;
+                source.Append("        ").Append(instances[i].Name).Append(" = new ").Append(enumType.Name).Append("(").Append(valueArg).Append(", ").Append(i.ToString(CultureInfo.InvariantCulture)).AppendLine(");");
+            }
+            source.Append("        __all = new ").Append(enumTypeName).AppendLine("[]");
+            source.AppendLine("        {");
+            for (var i = 0; i < instances.Count; i++)
+            {
+                source.Append("            ").Append(instances[i].Name).AppendLine(",");
+            }
+            source.AppendLine("        };");
+            source.AppendLine("    }");
+            source.AppendLine();
+            source.Append("    private static readonly ").Append(enumTypeName).AppendLine("[] __all;");
+        }
+        else
+        {
+            source.Append("    private static readonly ").Append(enumTypeName).AppendLine("[] __all =");
+            source.AppendLine("    {");
+            for (var i = 0; i < instances.Count; i++)
+            {
+                source.Append("        ").Append(instances[i].Name).AppendLine(",");
+            }
+            source.AppendLine("    };");
+        }
+        source.AppendLine();
+        source.Append("    public static global::System.ReadOnlySpan<").Append(enumTypeName).AppendLine("> All => __all;");
         source.AppendLine();
 
         if (useValueFrozen)
@@ -580,26 +721,45 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
         source.Append("    public static global::System.Collections.Generic.IReadOnlyList<").Append(enumTypeName).AppendLine("> List => __all;");
         source.AppendLine();
-        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
-        source.Append("    public static bool TryFromValue(").Append(isStringValue ? "string value" : valueTryFromSignature).Append(", out ").Append(enumTypeName).AppendLine(" result)");
-        source.AppendLine("    {");
+
         if (isStringValue)
         {
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.Append("    public static bool TryFromValue(global::System.ReadOnlySpan<char> value, out ").Append(enumTypeName).AppendLine(" result)");
+            source.AppendLine("    {");
             if (useValueFrozen)
             {
-                source.AppendLine("        if (value is not null && __valueMap.TryGetValue(value, out result))");
+                source.AppendLine("        if (__valueMap.TryGetValue(value.ToString(), out result))");
                 source.AppendLine("            return true;");
                 source.AppendLine();
                 source.AppendLine("        result = default!;");
                 source.AppendLine("        return false;");
             }
+            else if (instances.Count <= _spanLengthCharThreshold)
+            {
+                AppendStringDecisionTreeBody(source, valueItemsWithText, "value", 2);
+            }
             else
             {
-                AppendStringSwitchBody(source, valueItems, "value", 2);
+                AppendSequenceEqualBody(source, valueItems, "value", 2);
             }
+            source.AppendLine("    }");
+            source.AppendLine();
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.Append("    public static bool TryFromValue(string? value, out ").Append(enumTypeName).AppendLine(" result)");
+            source.AppendLine("    {");
+            source.AppendLine("        if (value is null) { result = default!; return false; }");
+            source.AppendLine();
+            AppendStringConstantSwitchBody(source, valueItems, "value", 2);
+            source.AppendLine();
+            source.AppendLine("    }");
+            source.AppendLine();
         }
         else
         {
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.Append("    public static bool TryFromValue(").Append(valueTryFromSignature).Append(", out ").Append(enumTypeName).AppendLine(" result)");
+            source.AppendLine("    {");
             source.AppendLine("        switch (value)");
             source.AppendLine("        {");
             for (var i = 0; i < instances.Count; i++)
@@ -610,16 +770,6 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine("                result = default!;");
             source.AppendLine("                return false;");
             source.AppendLine("        }");
-        }
-        source.AppendLine("    }");
-        source.AppendLine();
-
-        if (isStringValue)
-        {
-            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
-            source.Append("    public static bool TryFromValue(global::System.ReadOnlySpan<char> value, out ").Append(enumTypeName).AppendLine(" result)");
-            source.AppendLine("    {");
-            AppendSpanSwitchBody(source, valueItems, "value", 2);
             source.AppendLine("    }");
             source.AppendLine();
         }
@@ -630,24 +780,38 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.AppendLine("        if (TryFromValue(value, out var result))");
         source.AppendLine("            return result;");
         source.AppendLine();
-        source.AppendLine("        throw new global::System.ArgumentOutOfRangeException(nameof(value), value, \"Unknown enum value.\");");
+        source.AppendLine("        return ThrowHelper.UnknownValue(value);");
         source.AppendLine("    }");
         source.AppendLine();
+
         source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
-        source.Append("    public static bool TryFromName(string name, out ").Append(enumTypeName).AppendLine(" result)");
+        source.Append("    public static bool TryFromName(global::System.ReadOnlySpan<char> name, out ").Append(enumTypeName).AppendLine(" result)");
         source.AppendLine("    {");
         if (useNameFrozen)
         {
-            source.AppendLine("        if (name is not null && __nameMap.TryGetValue(name, out result))");
+            source.AppendLine("        if (__nameMap.TryGetValue(name.ToString(), out result))");
             source.AppendLine("            return true;");
             source.AppendLine();
             source.AppendLine("        result = default!;");
             source.AppendLine("        return false;");
         }
+        else if (instances.Count <= _spanLengthCharThreshold)
+        {
+            AppendStringDecisionTreeBody(source, nameItemsWithText, "name", 2);
+        }
         else
         {
-            AppendStringSwitchBody(source, nameItems, "name", 2);
+            AppendSequenceEqualBody(source, nameItems, "name", 2);
         }
+        source.AppendLine("    }");
+        source.AppendLine();
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+        source.Append("    public static bool TryFromName(string? name, out ").Append(enumTypeName).AppendLine(" result)");
+        source.AppendLine("    {");
+        source.AppendLine("        if (name is null) { result = default!; return false; }");
+        source.AppendLine();
+        AppendStringConstantSwitchBody(source, nameItems, "name", 2);
+        source.AppendLine();
         source.AppendLine("    }");
         source.AppendLine();
 
@@ -657,8 +821,21 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.AppendLine("        if (TryFromName(name, out var result))");
         source.AppendLine("            return result;");
         source.AppendLine();
-        source.AppendLine("        throw new global::System.ArgumentOutOfRangeException(nameof(name), name, \"Unknown enum name.\");");
+        source.AppendLine("        return ThrowHelper.UnknownName(name);");
         source.AppendLine("    }");
+        source.AppendLine("}");
+        source.AppendLine();
+        source.AppendLine("file static class ThrowHelper");
+        source.AppendLine("{");
+        source.AppendLine("    [global::System.Diagnostics.CodeAnalysis.DoesNotReturn]");
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]");
+        source.Append("    public static ").Append(enumTypeName).Append(" UnknownValue(").Append(valueTypeName).AppendLine(" value)");
+        source.AppendLine("        => throw new global::System.ArgumentOutOfRangeException(nameof(value), value, \"Unknown enum value.\");");
+        source.AppendLine();
+        source.AppendLine("    [global::System.Diagnostics.CodeAnalysis.DoesNotReturn]");
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]");
+        source.Append("    public static ").Append(enumTypeName).AppendLine(" UnknownName(string name)");
+        source.AppendLine("        => throw new global::System.ArgumentOutOfRangeException(nameof(name), name, \"Unknown enum name.\");");
         source.AppendLine("}");
         source.AppendLine();
         source.Append("file sealed class ").Append(stjConverterTypeName).Append(" : global::System.Text.Json.Serialization.JsonConverter<").Append(enumTypeName).AppendLine(">");
@@ -874,6 +1051,37 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.Append(innerIndent).Append("case \"").Append(EscapeString(text)).Append("\": result = ").Append(targetName).AppendLine("; return true;");
         }
 
+        source.Append(innerIndent).AppendLine("default:");
+        source.Append(innerIndent).AppendLine("    result = default!;");
+        source.Append(innerIndent).AppendLine("    return false;");
+        source.Append(indent).AppendLine("}");
+    }
+
+    private static void AppendSequenceEqualBody(StringBuilder source, List<(string ConstantName, string TargetName)> items, string inputIdentifier, int indentLevel)
+    {
+        string indent = new(' ', indentLevel * 4);
+
+        foreach ((string constantName, string targetName) in items)
+        {
+            source.Append(indent).Append("if (global::System.MemoryExtensions.SequenceEqual(").Append(inputIdentifier)
+                .Append(", ").Append(constantName).Append(")) { result = ").Append(targetName).AppendLine("; return true; }");
+        }
+
+        source.Append(indent).AppendLine("result = default!;");
+        source.Append(indent).AppendLine("return false;");
+    }
+
+    private static void AppendStringConstantSwitchBody(StringBuilder source, List<(string ConstantName, string TargetName)> items, string paramName, int indentLevel)
+    {
+        string indent = new(' ', indentLevel * 4);
+        string innerIndent = new(' ', (indentLevel + 1) * 4);
+
+        source.Append(indent).Append("switch (").Append(paramName).AppendLine(")");
+        source.Append(indent).AppendLine("{");
+        foreach ((string constantName, string targetName) in items)
+        {
+            source.Append(innerIndent).Append("case ").Append(constantName).Append(": result = ").Append(targetName).AppendLine("; return true;");
+        }
         source.Append(innerIndent).AppendLine("default:");
         source.Append(innerIndent).AppendLine("    result = default!;");
         source.Append(innerIndent).AppendLine("    return false;");

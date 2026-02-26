@@ -1,13 +1,13 @@
-using Intellenum;
+using Soenneker.Gen.EnumValues;
 
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
 
 /// <summary>
-/// Intellenum type matching ColorCode (Red="R", Blue="B") for benchmarking.
+/// EnumValue type matching ColorCode (Red="R", Blue="B") for benchmarking.
 /// </summary>
-[Intellenum(conversions: Conversions.NewtonsoftJson | Conversions.SystemTextJson, underlyingType: typeof(string))]
-[Member("Red", "R")]
-[Member("Blue", "B")]
+[EnumValue<string>]
 public partial class ColorCodeIntellenum
 {
+    public static readonly ColorCodeIntellenum Red = new("R");
+    public static readonly ColorCodeIntellenum Blue = new("B");
 }

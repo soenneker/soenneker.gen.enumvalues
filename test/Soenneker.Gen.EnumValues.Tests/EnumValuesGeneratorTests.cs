@@ -168,4 +168,31 @@ public sealed class EnumValuesGeneratorTests
         ColorCode? stringValue = global::Newtonsoft.Json.JsonConvert.DeserializeObject<ColorCode>("\"R\"");
         stringValue.Should().BeSameAs(ColorCode.Red);
     }
+
+    [Fact]
+    public void Name_is_generated_for_class_enum_values()
+    {
+        ColorCode.Red.Name.Should().Be("Red");
+        ColorCode.Blue.Name.Should().Be("Blue");
+
+        OrderStatus.Pending.Name.Should().Be("Pending");
+        OrderStatus.Completed.Name.Should().Be("Completed");
+    }
+
+    [Fact]
+    public void Name_is_generated_for_struct_enum_values()
+    {
+        SizeCode.Small.Name.Should().Be("Small");
+        SizeCode.Large.Name.Should().Be("Large");
+
+        PriorityLevel.Low.Name.Should().Be("Low");
+        PriorityLevel.High.Name.Should().Be("High");
+    }
+
+    [Fact]
+    public void Name_returns_empty_string_for_default_struct()
+    {
+        default(PriorityLevel).Name.Should().Be("");
+        default(SizeCode).Name.Should().Be("");
+    }
 }

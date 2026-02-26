@@ -1,3 +1,4 @@
+using System;
 using BenchmarkDotNet.Attributes;
 
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
@@ -11,11 +12,33 @@ public class TryFromNameBenchmark
     private readonly string _miss = "Unknown";
 
     [Benchmark(Baseline = true)]
-    public (ColorCode?, ColorCode?) GenEnumValues()
+    public (ColorCode, ColorCode) TryFromName_String_Known()
     {
         ColorCode.TryFromName(_red, out ColorCode r);
         ColorCode.TryFromName(_blue, out ColorCode b);
         return (r, b);
+    }
+
+    [Benchmark]
+    public (bool, ColorCode) TryFromName_String_Unknown()
+    {
+        bool ok = ColorCode.TryFromName(_miss, out ColorCode result);
+        return (ok, result);
+    }
+
+    [Benchmark]
+    public (ColorCode, ColorCode) TryFromName_Span_Known()
+    {
+        ColorCode.TryFromName(_red.AsSpan(), out ColorCode r);
+        ColorCode.TryFromName(_blue.AsSpan(), out ColorCode b);
+        return (r, b);
+    }
+
+    [Benchmark]
+    public (bool, ColorCode) TryFromName_Span_Unknown()
+    {
+        bool ok = ColorCode.TryFromName(_miss.AsSpan(), out ColorCode result);
+        return (ok, result);
     }
 
     [Benchmark]

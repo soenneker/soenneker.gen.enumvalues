@@ -4,12 +4,13 @@ namespace Soenneker.Gen.EnumValues;
 
 internal sealed class EnumInstance
 {
-    public EnumInstance(string name, string valueLiteral, string? stringValue, Location location)
+    public EnumInstance(string name, string valueLiteral, string? stringValue, Location location, byte? id = null)
     {
         Name = name;
         ValueLiteral = valueLiteral;
         StringValue = stringValue;
         Location = location;
+        Id = id;
     }
 
     public string Name { get; }
@@ -19,4 +20,6 @@ internal sealed class EnumInstance
     public string? StringValue { get; }
 
     public Location Location { get; }
+
+    public byte? Id { get; }
 }

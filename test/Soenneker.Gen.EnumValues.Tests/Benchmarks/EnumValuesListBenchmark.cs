@@ -22,7 +22,7 @@ public class EnumValuesListBenchmark
     // [Benchmark]
     public System.Collections.Generic.IReadOnlyList<ColorCodeIntellenum> Intellenum_Small()
     {
-        return ColorCodeIntellenum.List().ToList();
+        return ColorCodeIntellenum.List;
     }
 
     [Benchmark]
