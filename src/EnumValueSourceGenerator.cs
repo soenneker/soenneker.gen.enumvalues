@@ -532,6 +532,10 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             ? instances.Select(static instance => (instance.Name + "Value", instance.Name)).ToList()
             : instances.Select(static instance => (instance.StringValue ?? string.Empty, instance.Name)).ToList();
         List<(string ConstantName, string TargetName)> nameItems = instances.Select(static instance => (instance.Name + "Name", instance.Name)).ToList();
+        List<(string Text, string TargetName)> valueSpanItems = isStringValue
+            ? instances.Select(static instance => (instance.StringValue ?? string.Empty, instance.Name)).ToList()
+            : new List<(string Text, string TargetName)>();
+        List<(string Text, string TargetName)> nameSpanItems = instances.Select(static instance => (instance.Name, instance.Name)).ToList();
 
         var source = new StringBuilder();
 
@@ -560,12 +564,18 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine();
         }
 
-        // For struct with (value, name) constructor we store name in _name. For class, Name is always the member name (expression-bodied).
+        // For struct with (value, name) constructor we store name in _name. For class with string value, store name in _name set in ctor (zero branching).
         bool useStoredName = useValueNameConstructor && enumType.TypeKind == TypeKind.Struct;
+        bool useStoredNameForClass = isStringValue && !hasNameProperty && enumType.IsReferenceType;
         if (!hasNameProperty && useStoredName)
         {
             source.AppendLine("    private readonly string? _name;");
             source.AppendLine("    public string Name => _name ?? \"\";");
+            source.AppendLine();
+        }
+        if (!hasNameProperty && useStoredNameForClass)
+        {
+            source.AppendLine("    private readonly string _name;");
             source.AppendLine();
         }
 
@@ -587,14 +597,38 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             }
             else
             {
-                source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value) => Value = value;");
-                source.AppendLine();
+                if (useStoredNameForClass)
+                {
+                    source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).AppendLine(" value)");
+                    source.AppendLine("    {");
+                    source.AppendLine("        Value = value;");
+                    source.AppendLine("        _name = value switch");
+                    source.AppendLine("        {");
+                    for (var i = 0; i < instances.Count; i++)
+                    {
+                        string val = instances[i].StringValue ?? string.Empty;
+                        source.Append("            \"").Append(EscapeString(val)).Append("\" => \"").Append(EscapeString(instances[i].Name)).AppendLine("\",");
+                    }
+                    source.AppendLine("            _ => \"\"");
+                    source.AppendLine("        };");
+                    source.AppendLine("    }");
+                }
+                else
+                {
+                    source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value) => Value = value;");
+                    source.AppendLine();
+                }
             }
             source.AppendLine();
         }
 
-        // Expression-bodied Name: for class always use member name (ReferenceEquals); for struct when not using stored _name.
-        if (!hasNameProperty && (!useValueNameConstructor || enumType.IsReferenceType))
+        // Name: use stored _name when available (class with string value, or struct with value+name ctor); otherwise expression-bodied.
+        if (!hasNameProperty && useStoredNameForClass)
+        {
+            source.AppendLine("    public string Name => _name;");
+            source.AppendLine();
+        }
+        else if (!hasNameProperty && (!useValueNameConstructor || enumType.IsReferenceType))
         {
             source.AppendLine("    public string Name");
             source.Append("        => ");
@@ -694,18 +728,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.Append("    public static bool TryFromValue(global::System.ReadOnlySpan<char> value, out ").Append(enumTypeName).AppendLine(" result)");
             source.AppendLine("    {");
-            if (useValueFrozen)
-            {
-                source.AppendLine("        if (__valueMap.TryGetValue(value.ToString(), out result))");
-                source.AppendLine("            return true;");
-                source.AppendLine();
-                source.AppendLine("        result = default!;");
-                source.AppendLine("        return false;");
-            }
-            else
-            {
-                source.AppendLine("        return TryFromValue(value.ToString(), out result);");
-            }
+            AppendSpanFirstCharSwitchBody(source, valueSpanItems, "value", 2);
             source.AppendLine("    }");
             source.AppendLine();
             source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
@@ -750,18 +773,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
         source.Append("    public static bool TryFromName(global::System.ReadOnlySpan<char> name, out ").Append(enumTypeName).AppendLine(" result)");
         source.AppendLine("    {");
-        if (useNameFrozen)
-        {
-            source.AppendLine("        if (__nameMap.TryGetValue(name.ToString(), out result))");
-            source.AppendLine("            return true;");
-            source.AppendLine();
-            source.AppendLine("        result = default!;");
-            source.AppendLine("        return false;");
-        }
-        else
-        {
-            source.AppendLine("        return TryFromName(name.ToString(), out result);");
-        }
+        AppendSpanFirstCharSwitchBody(source, nameSpanItems, "name", 2);
         source.AppendLine("    }");
         source.AppendLine();
         source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
@@ -794,7 +806,16 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.Append("        => obj is ").Append(enumTypeName).AppendLine(" other && global::System.String.Equals(Value, other.Value, global::System.StringComparison.Ordinal);");
             source.AppendLine();
             source.AppendLine("    public override int GetHashCode()");
-            source.AppendLine("        => Value is { } v ? global::System.StringComparer.Ordinal.GetHashCode(v) : 0;");
+            source.AppendLine("        => global::System.StringComparer.Ordinal.GetHashCode(Value);");
+            source.AppendLine();
+            source.Append("    public static bool operator ==(").Append(enumTypeName).Append(" left, ").Append(enumTypeName).AppendLine(" right)");
+            if (enumType.IsReferenceType)
+                source.AppendLine("        => global::System.Object.ReferenceEquals(left, right);");
+            else
+                source.AppendLine("        => global::System.String.Equals(left.Value, right.Value, global::System.StringComparison.Ordinal);");
+            source.AppendLine();
+            source.Append("    public static bool operator !=(").Append(enumTypeName).Append(" left, ").Append(enumTypeName).AppendLine(" right)");
+            source.AppendLine("        => !(left == right);");
             source.AppendLine();
             source.Append("    public static bool operator ==(").Append(enumTypeName).AppendLine(" left, string? right)");
             source.AppendLine("        => global::System.String.Equals(left.Value, right, global::System.StringComparison.Ordinal);");
@@ -1147,8 +1168,8 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         string indent = new(' ', indentLevel * 4);
         string innerIndent = new(' ', (indentLevel + 1) * 4);
         string branchIndent = new(' ', (indentLevel + 2) * 4);
-        string leafIndent = new(' ', (indentLevel + 3) * 4);
         string lenExpression = lengthExpression ?? inputIdentifier + ".Length";
+        const string memExt = "global::System.MemoryExtensions";
 
         IEnumerable<IGrouping<int, (string Text, string TargetName)>> lengthGroups = items
             .GroupBy(static item => item.Text.Length)
@@ -1162,59 +1183,41 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 
         foreach (IGrouping<int, (string Text, string TargetName)> lengthGroup in lengthGroups)
         {
-            source.Append(innerIndent).Append("case ").Append(lengthGroup.Key).AppendLine(":");
+            int len = lengthGroup.Key;
+            source.Append(innerIndent).Append("case ").Append(len).AppendLine(":");
+            source.Append(branchIndent).AppendLine("{");
             List<(string Text, string TargetName)> lengthCandidates = lengthGroup.ToList();
 
             if (lengthCandidates.Count == 1)
             {
                 (string text, string targetName) = lengthCandidates[0];
-                source.Append(branchIndent).Append("if (global::System.MemoryExtensions.SequenceEqual(").Append(inputIdentifier)
-                    .Append(", global::System.MemoryExtensions.AsSpan(\"").Append(EscapeString(text)).AppendLine("\")))");
-                source.Append(branchIndent).AppendLine("{");
-                source.Append(branchIndent).Append("    result = ").Append(targetName).AppendLine(";");
-                source.Append(branchIndent).AppendLine("    return true;");
+                if (len == 1)
+                    source.Append(branchIndent).Append("    if (").Append(inputIdentifier).Append("[0] == '").Append(EscapeChar(text[0])).AppendLine("')");
+                else
+                    source.Append(branchIndent).Append("    if (").Append(memExt).Append(".SequenceEqual(").Append(inputIdentifier).Append(", ").Append(memExt).Append(".AsSpan(\"").Append(EscapeString(text)).AppendLine("\")))");
+                source.Append(branchIndent).AppendLine("    {");
+                source.Append(branchIndent).Append("        result = ").Append(targetName).AppendLine(";");
+                source.Append(branchIndent).AppendLine("        return true;");
+                source.Append(branchIndent).AppendLine("    }");
+                source.Append(branchIndent).AppendLine("    break;");
                 source.Append(branchIndent).AppendLine("}");
-                source.Append(branchIndent).AppendLine("break;");
                 continue;
             }
 
-            source.Append(branchIndent).Append("switch (").Append(inputIdentifier).AppendLine("[0])");
-            source.Append(branchIndent).AppendLine("{");
-
-            IEnumerable<IGrouping<char, (string Text, string TargetName)>> firstCharGroups = lengthGroup
-                .GroupBy(static item => item.Text[0])
-                .OrderBy(static group => group.Key);
-
-            foreach (IGrouping<char, (string Text, string TargetName)> firstCharGroup in firstCharGroups)
+            source.Append(branchIndent).Append("    char c0 = ").Append(inputIdentifier).AppendLine("[0];");
+            foreach ((string text, string targetName) in lengthCandidates)
             {
-                source.Append(leafIndent).Append("case '").Append(EscapeChar(firstCharGroup.Key)).AppendLine("':");
-
-                if (lengthGroup.Key == 1)
-                {
-                    (_, string targetName) = firstCharGroup.First();
-                    source.Append(leafIndent).Append("    result = ").Append(targetName).AppendLine(";");
-                    source.Append(leafIndent).AppendLine("    return true;");
-                }
+                if (len == 1)
+                    source.Append(branchIndent).Append("    if (c0 == '").Append(EscapeChar(text[0])).AppendLine("')");
                 else
-                {
-                    foreach ((string text, string targetName) in firstCharGroup)
-                    {
-                        source.Append(leafIndent).Append("    if (global::System.MemoryExtensions.SequenceEqual(").Append(inputIdentifier)
-                            .Append(", global::System.MemoryExtensions.AsSpan(\"").Append(EscapeString(text)).AppendLine("\")))");
-                        source.Append(leafIndent).Append("    {");
-                        source.AppendLine();
-                        source.Append(leafIndent).Append("        result = ").Append(targetName).AppendLine(";");
-                        source.Append(leafIndent).AppendLine("        return true;");
-                        source.Append(leafIndent).AppendLine("    }");
-                    }
-                    source.Append(leafIndent).AppendLine("    break;");
-                }
+                    source.Append(branchIndent).Append("    if (c0 == '").Append(EscapeChar(text[0])).Append("' && ").Append(memExt).Append(".SequenceEqual(").Append(inputIdentifier).Append(", ").Append(memExt).Append(".AsSpan(\"").Append(EscapeString(text)).AppendLine("\")))");
+                source.Append(branchIndent).AppendLine("    {");
+                source.Append(branchIndent).Append("        result = ").Append(targetName).AppendLine(";");
+                source.Append(branchIndent).AppendLine("        return true;");
+                source.Append(branchIndent).AppendLine("    }");
             }
-
-            source.Append(leafIndent).AppendLine("default:");
-            source.Append(leafIndent).AppendLine("    break;");
+            source.Append(branchIndent).AppendLine("    break;");
             source.Append(branchIndent).AppendLine("}");
-            source.Append(branchIndent).AppendLine("break;");
         }
 
         source.Append(innerIndent).AppendLine("default:");

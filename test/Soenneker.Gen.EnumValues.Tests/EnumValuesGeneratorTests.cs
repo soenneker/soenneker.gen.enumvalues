@@ -292,6 +292,16 @@ public sealed class EnumValuesGeneratorTests
     }
 
     [Fact]
+    public void Singleton_equals_should_be_true()
+    {
+        var testObject1 = new TestObject { ColorCode = ColorCode.Red };
+        var testObject2 = new TestObject { ColorCode = ColorCode.Red };
+
+       (testObject1.ColorCode == testObject2.ColorCode).Should()
+                                                        .BeTrue();
+    }
+
+    [Fact]
     public void String_enum_Equals_and_GetHashCode_by_value()
     {
         ColorCode red1 = ColorCode.FromValue("R");
