@@ -133,7 +133,7 @@ public sealed class EnumValuesGeneratorTests
         const string colorCode = ColorCode.RedValue;
         const int statusCode = OrderStatus.PendingValue;
 
-        bool matchedColor = false;
+        var matchedColor = false;
         switch (colorCode)
         {
             case ColorCode.RedValue:
@@ -141,7 +141,7 @@ public sealed class EnumValuesGeneratorTests
                 break;
         }
 
-        bool matchedStatus = false;
+        var matchedStatus = false;
         switch (statusCode)
         {
             case OrderStatus.PendingValue:
@@ -159,13 +159,13 @@ public sealed class EnumValuesGeneratorTests
         string intJson = global::Newtonsoft.Json.JsonConvert.SerializeObject(OrderStatus.Pending);
         intJson.Should().Be("1");
 
-        OrderStatus? intValue = global::Newtonsoft.Json.JsonConvert.DeserializeObject<OrderStatus>("1");
+        var intValue = global::Newtonsoft.Json.JsonConvert.DeserializeObject<OrderStatus>("1");
         intValue.Should().BeSameAs(OrderStatus.Pending);
 
         string stringJson = global::Newtonsoft.Json.JsonConvert.SerializeObject(ColorCode.Red);
         stringJson.Should().Be("\"R\"");
 
-        ColorCode? stringValue = global::Newtonsoft.Json.JsonConvert.DeserializeObject<ColorCode>("\"R\"");
+        var stringValue = global::Newtonsoft.Json.JsonConvert.DeserializeObject<ColorCode>("\"R\"");
         stringValue.Should().BeSameAs(ColorCode.Red);
     }
 
@@ -177,6 +177,24 @@ public sealed class EnumValuesGeneratorTests
 
         OrderStatus.Pending.Name.Should().Be("Pending");
         OrderStatus.Completed.Name.Should().Be("Completed");
+    }
+
+    [Fact]
+    public void Name_is_generated_for_class_enum_instances()
+    {
+        ColorCode variable = ColorCode.Red;
+        variable.Name.Should()
+                .Be("Red");
+    }
+
+    [Fact]
+    public void Name_is_generated_for_class_enum_on_objects()
+    {
+        var testObject = new TestObject();
+        testObject.ColorCode = ColorCode.Red;
+
+        testObject.ColorCode.Name.Should()
+                  .Be("Red");
     }
 
     [Fact]
@@ -194,5 +212,37 @@ public sealed class EnumValuesGeneratorTests
     {
         default(PriorityLevel).Name.Should().Be("");
         default(SizeCode).Name.Should().Be("");
+    }
+
+    [Fact]
+    public void All_enum_value_instances_have_Name_property_set()
+    {
+        foreach (ColorCode instance in ColorCode.List)
+            instance.Name.Should().NotBeNullOrEmpty();
+
+        foreach (OrderStatus instance in OrderStatus.List)
+            instance.Name.Should().NotBeNullOrEmpty();
+
+        foreach (SizeCode instance in SizeCode.List)
+            instance.Name.Should().NotBeNullOrEmpty();
+
+        foreach (PriorityLevel instance in PriorityLevel.List)
+            instance.Name.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public void Name_property_matches_nameof_for_enum_value_members()
+    {
+        nameof(ColorCode.Red).Should().Be(ColorCode.Red.Name);
+        nameof(ColorCode.Blue).Should().Be(ColorCode.Blue.Name);
+
+        nameof(OrderStatus.Pending).Should().Be(OrderStatus.Pending.Name);
+        nameof(OrderStatus.Completed).Should().Be(OrderStatus.Completed.Name);
+
+        nameof(SizeCode.Small).Should().Be(SizeCode.Small.Name);
+        nameof(SizeCode.Large).Should().Be(SizeCode.Large.Name);
+
+        nameof(PriorityLevel.Low).Should().Be(PriorityLevel.Low.Name);
+        nameof(PriorityLevel.High).Should().Be(PriorityLevel.High.Name);
     }
 }

@@ -557,32 +557,24 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine();
         }
 
-        if (!hasNameProperty && useValueNameConstructor)
+        // For struct with (value, name) constructor we store name in _name. For class, Name is always the member name (expression-bodied).
+        bool useStoredName = useValueNameConstructor && enumType.TypeKind == TypeKind.Struct;
+        if (!hasNameProperty && useStoredName)
         {
-            if (enumType.TypeKind == TypeKind.Struct)
-            {
-                source.AppendLine("    private readonly string? _name;");
-                source.AppendLine("    public string Name => _name ?? \"\";");
-            }
-            else
-            {
-                source.AppendLine("    public string Name { get; }");
-            }
+            source.AppendLine("    private readonly string? _name;");
+            source.AppendLine("    public string Name => _name ?? \"\";");
             source.AppendLine();
         }
 
         if (!hasValueConstructor)
         {
-            if (useValueNameConstructor)
+            if (useValueNameConstructor && enumType.TypeKind == TypeKind.Struct)
             {
                 source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value, string name)");
                 source.AppendLine();
                 source.AppendLine("    {");
                 source.AppendLine("        Value = value;");
-                if (enumType.TypeKind == TypeKind.Struct)
-                    source.AppendLine("        _name = name;");
-                else
-                    source.AppendLine("        Name = name;");
+                source.AppendLine("        _name = name;");
                 source.AppendLine("    }");
                 source.AppendLine();
                 source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value) : this(value, \"\")");
@@ -598,7 +590,8 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine();
         }
 
-        if (!hasNameProperty && !useValueNameConstructor)
+        // Expression-bodied Name: for class always use member name (ReferenceEquals); for struct when not using stored _name.
+        if (!hasNameProperty && (!useValueNameConstructor || enumType.IsReferenceType))
         {
             source.AppendLine("    public string Name");
             source.Append("        => ");
@@ -618,7 +611,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine();
         }
 
-        bool emittedValueConstant = false;
+        var emittedValueConstant = false;
         bool canEmitConstant = CanEmitConstant(valueType);
 
         for (var i = 0; i < instances.Count; i++)
@@ -634,7 +627,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         if (emittedValueConstant)
             source.AppendLine();
 
-        bool emittedNameConstant = false;
+        var emittedNameConstant = false;
         if (!useNameFrozen && instances.Count > 0)
         {
             for (var i = 0; i < instances.Count; i++)
@@ -643,7 +636,7 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 if (enumType.GetMembers(nameFieldName).Length > 0)
                     continue;
                 emittedNameConstant = true;
-                source.Append("    private const string ").Append(nameFieldName).Append(" = \"").Append(EscapeString(instances[i].Name)).AppendLine("\";");
+                source.Append("    public const string ").Append(nameFieldName).Append(" = \"").Append(EscapeString(instances[i].Name)).AppendLine("\";");
             }
             if (emittedNameConstant)
                 source.AppendLine();

@@ -2,7 +2,6 @@ using BenchmarkDotNet.Reports;
 using Soenneker.Benchmarking.Extensions.Summary;
 using Soenneker.Tests.Benchmark;
 using System.Threading.Tasks;
-using Soenneker.Facts.Local;
 using Xunit;
 
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
