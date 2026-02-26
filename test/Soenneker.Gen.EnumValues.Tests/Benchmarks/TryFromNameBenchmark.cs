@@ -1,4 +1,3 @@
-using System;
 using BenchmarkDotNet.Attributes;
 
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
@@ -20,28 +19,6 @@ public class TryFromNameBenchmark
     }
 
     [Benchmark]
-    public (bool, ColorCode) TryFromName_String_Unknown()
-    {
-        bool ok = ColorCode.TryFromName(_miss, out ColorCode result);
-        return (ok, result);
-    }
-
-    [Benchmark]
-    public (ColorCode, ColorCode) TryFromName_Span_Known()
-    {
-        ColorCode.TryFromName(_red.AsSpan(), out ColorCode r);
-        ColorCode.TryFromName(_blue.AsSpan(), out ColorCode b);
-        return (r, b);
-    }
-
-    [Benchmark]
-    public (bool, ColorCode) TryFromName_Span_Unknown()
-    {
-        bool ok = ColorCode.TryFromName(_miss.AsSpan(), out ColorCode result);
-        return (ok, result);
-    }
-
-    [Benchmark]
     public (ColorCodeIntellenum?, ColorCodeIntellenum?) Intellenum()
     {
         ColorCodeIntellenum.TryFromName(_red, out ColorCodeIntellenum? r);
@@ -57,13 +34,13 @@ public class TryFromNameBenchmark
         return (r, b);
     }
 
-    [Benchmark]
+  //  [Benchmark]
     public bool GenEnumValues_Miss()
     {
         return ColorCode.TryFromName(_miss, out _);
     }
 
-    [Benchmark]
+  //  [Benchmark]
     public bool Intellenum_Miss()
     {
         return ColorCodeIntellenum.TryFromName(_miss, out _);

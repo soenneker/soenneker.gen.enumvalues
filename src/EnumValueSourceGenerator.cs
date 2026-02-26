@@ -16,7 +16,6 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
 {
     private const int _valueFrozenThreshold = 128;
     private const int _nameFrozenThreshold = 256;
-    private const int _spanLengthCharThreshold = 24;
 
     private static readonly DiagnosticDescriptor _typeMustBePartialDescriptor = new(
         id: "SEV001",
@@ -375,7 +374,10 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             return false;
 
         if (argumentList.Arguments.Count >= 2)
-            hasExplicitOrdinal = true;
+        {
+            ITypeSymbol? secondArgType = semanticModel.GetTypeInfo(argumentList.Arguments[1].Expression).Type;
+            hasExplicitOrdinal = secondArgType?.SpecialType != SpecialType.System_String;
+        }
 
         ExpressionSyntax valueExpression = argumentList.Arguments[0].Expression;
         Optional<object?> constant = semanticModel.GetConstantValue(valueExpression);
@@ -524,16 +526,12 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         bool isStringValue = valueType.SpecialType == SpecialType.System_String;
         bool useValueFrozen = isStringValue && instances.Count > _valueFrozenThreshold;
         bool useNameFrozen = instances.Count > _nameFrozenThreshold;
-        bool useOrdinalName = !hasValueConstructor && !hasNameProperty && instances.Count > 0 && instances.Count <= 256;
+        bool useValueNameConstructor = !hasValueConstructor && !hasNameProperty;
         string valueTryFromSignature = isStringValue ? "string? value" : valueTypeName + " value";
         List<(string ConstantName, string TargetName)> valueItems = isStringValue
             ? instances.Select(static instance => (instance.Name + "Value", instance.Name)).ToList()
             : instances.Select(static instance => (instance.StringValue ?? string.Empty, instance.Name)).ToList();
         List<(string ConstantName, string TargetName)> nameItems = instances.Select(static instance => (instance.Name + "Name", instance.Name)).ToList();
-        List<(string Text, string TargetName)> nameItemsWithText = instances.Select(static instance => (instance.Name, instance.Name)).ToList();
-        List<(string Text, string TargetName)> valueItemsWithText = isStringValue
-            ? instances.Select(static instance => (instance.StringValue ?? "", instance.Name)).ToList()
-            : new List<(string Text, string TargetName)>();
 
         var source = new StringBuilder();
 
@@ -559,24 +557,35 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine();
         }
 
-        if (useOrdinalName)
+        if (!hasNameProperty && useValueNameConstructor)
         {
-            source.AppendLine("    private readonly byte _id;");
+            if (enumType.TypeKind == TypeKind.Struct)
+            {
+                source.AppendLine("    private readonly string? _name;");
+                source.AppendLine("    public string Name => _name ?? \"\";");
+            }
+            else
+            {
+                source.AppendLine("    public string Name { get; }");
+            }
             source.AppendLine();
         }
 
         if (!hasValueConstructor)
         {
-            if (useOrdinalName)
+            if (useValueNameConstructor)
             {
-                source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value, byte id)");
+                source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value, string name)");
                 source.AppendLine();
                 source.AppendLine("    {");
                 source.AppendLine("        Value = value;");
-                source.AppendLine("        _id = id;");
+                if (enumType.TypeKind == TypeKind.Struct)
+                    source.AppendLine("        _name = name;");
+                else
+                    source.AppendLine("        Name = name;");
                 source.AppendLine("    }");
                 source.AppendLine();
-                source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value) : this(value, 255)");
+                source.Append("    private ").Append(enumType.Name).Append("(").Append(valueTypeName).Append(" value) : this(value, \"\")");
                 source.AppendLine();
                 source.AppendLine("    {");
                 source.AppendLine("    }");
@@ -589,37 +598,23 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine();
         }
 
-        if (!hasNameProperty)
+        if (!hasNameProperty && !useValueNameConstructor)
         {
-            if (useOrdinalName)
+            source.AppendLine("    public string Name");
+            source.Append("        => ");
+            for (var i = 0; i < instances.Count; i++)
             {
-                source.AppendLine("    public string Name => _id switch");
-                source.AppendLine("    {");
-                for (var i = 0; i < instances.Count; i++)
-                {
-                    source.Append("        ").Append(i.ToString(CultureInfo.InvariantCulture)).Append(" => \"").Append(EscapeString(instances[i].Name)).AppendLine("\",");
-                }
-                source.AppendLine("        _ => \"\"");
-                source.AppendLine("    };");
+                if (i > 0)
+                    source.Append("     : ");
+                string condition = enumType.IsReferenceType
+                    ? "global::System.Object.ReferenceEquals(this, " + instances[i].Name + ")"
+                    : "global::System.Collections.Generic.EqualityComparer<" + enumTypeName + ">.Default.Equals(this, " + instances[i].Name + ")";
+                source.Append(condition).Append(" ? \"").Append(EscapeString(instances[i].Name)).Append("\"");
+                if (i < instances.Count - 1)
+                    source.AppendLine();
             }
-            else
-            {
-                source.AppendLine("    public string Name");
-                source.Append("        => ");
-                for (var i = 0; i < instances.Count; i++)
-                {
-                    if (i > 0)
-                        source.Append("     : ");
-                    string condition = enumType.IsReferenceType
-                        ? "global::System.Object.ReferenceEquals(this, " + instances[i].Name + ")"
-                        : "global::System.Collections.Generic.EqualityComparer<" + enumTypeName + ">.Default.Equals(this, " + instances[i].Name + ")";
-                    source.Append(condition).Append(" ? \"").Append(EscapeString(instances[i].Name)).Append("\"");
-                    if (i < instances.Count - 1)
-                        source.AppendLine();
-                }
-                source.AppendLine();
-                source.AppendLine("     : \"\";");
-            }
+            source.AppendLine();
+            source.AppendLine("     : \"\";");
             source.AppendLine();
         }
 
@@ -654,37 +649,13 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 source.AppendLine();
         }
 
-        if (useOrdinalName)
+        source.Append("    private static readonly ").Append(enumTypeName).Append("[] __all = new[] { ");
+        for (var i = 0; i < instances.Count; i++)
         {
-            source.Append("    static ").Append(enumType.Name).AppendLine("()");
-            source.AppendLine("    {");
-            for (var i = 0; i < instances.Count; i++)
-            {
-                string valueFieldName = instances[i].Name + "Value";
-                string valueArg = canEmitConstant ? valueFieldName : instances[i].ValueLiteral;
-                source.Append("        ").Append(instances[i].Name).Append(" = new ").Append(enumType.Name).Append("(").Append(valueArg).Append(", ").Append(i.ToString(CultureInfo.InvariantCulture)).AppendLine(");");
-            }
-            source.Append("        __all = new ").Append(enumTypeName).AppendLine("[]");
-            source.AppendLine("        {");
-            for (var i = 0; i < instances.Count; i++)
-            {
-                source.Append("            ").Append(instances[i].Name).AppendLine(",");
-            }
-            source.AppendLine("        };");
-            source.AppendLine("    }");
-            source.AppendLine();
-            source.Append("    private static readonly ").Append(enumTypeName).AppendLine("[] __all;");
+            if (i > 0) source.Append(", ");
+            source.Append(instances[i].Name);
         }
-        else
-        {
-            source.Append("    private static readonly ").Append(enumTypeName).AppendLine("[] __all =");
-            source.AppendLine("    {");
-            for (var i = 0; i < instances.Count; i++)
-            {
-                source.Append("        ").Append(instances[i].Name).AppendLine(",");
-            }
-            source.AppendLine("    };");
-        }
+        source.AppendLine(" };");
         source.AppendLine();
         source.Append("    public static global::System.ReadOnlySpan<").Append(enumTypeName).AppendLine("> All => __all;");
         source.AppendLine();
@@ -735,13 +706,9 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
                 source.AppendLine("        result = default!;");
                 source.AppendLine("        return false;");
             }
-            else if (instances.Count <= _spanLengthCharThreshold)
-            {
-                AppendStringDecisionTreeBody(source, valueItemsWithText, "value", 2);
-            }
             else
             {
-                AppendSequenceEqualBody(source, valueItems, "value", 2);
+                source.AppendLine("        return TryFromValue(value.ToString(), out result);");
             }
             source.AppendLine("    }");
             source.AppendLine();
@@ -795,13 +762,9 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine("        result = default!;");
             source.AppendLine("        return false;");
         }
-        else if (instances.Count <= _spanLengthCharThreshold)
-        {
-            AppendStringDecisionTreeBody(source, nameItemsWithText, "name", 2);
-        }
         else
         {
-            AppendSequenceEqualBody(source, nameItems, "name", 2);
+            source.AppendLine("        return TryFromName(name.ToString(), out result);");
         }
         source.AppendLine("    }");
         source.AppendLine();
@@ -967,77 +930,6 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         }
     }
 
-    private static void AppendStringDecisionTreeBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel,
-        bool writeNoMatchTail = true, int? maxLength = null)
-    {
-        string indent = new(' ', indentLevel * 4);
-        string innerIndent = new(' ', (indentLevel + 1) * 4);
-        string branchIndent = new(' ', (indentLevel + 2) * 4);
-
-        IEnumerable<IGrouping<int, (string Text, string TargetName)>> groups = items
-            .Where(static item => item.Text.Length >= 0)
-            .GroupBy(static item => item.Text.Length)
-            .OrderBy(static group => group.Key);
-
-        if (maxLength.HasValue)
-            groups = groups.Where(group => group.Key <= maxLength.Value);
-
-        source.Append(indent).Append("switch (").Append(inputIdentifier).AppendLine(".Length)");
-        source.Append(indent).AppendLine("{");
-
-        foreach (IGrouping<int, (string Text, string TargetName)> group in groups)
-        {
-            source.Append(innerIndent).Append("case ").Append(group.Key).AppendLine(":");
-
-            if (group.Key == 1)
-            {
-                source.Append(branchIndent).Append("char c0 = ").Append(inputIdentifier).AppendLine("[0];");
-            }
-
-            foreach ((string text, string targetName) in group)
-            {
-                if (group.Key == 0)
-                {
-                    source.Append(branchIndent).Append("result = ").Append(targetName).AppendLine(";");
-                    source.Append(branchIndent).AppendLine("return true;");
-                    continue;
-                }
-
-                source.Append(branchIndent).Append("if (");
-
-                for (var i = 0; i < text.Length; i++)
-                {
-                    if (i > 0)
-                        source.Append(" && ");
-
-                    if (group.Key == 1 && i == 0)
-                        source.Append("c0 == '").Append(EscapeChar(text[i])).Append("'");
-                    else
-                        source.Append(inputIdentifier).Append("[").Append(i).Append("] == '").Append(EscapeChar(text[i])).Append("'");
-                }
-
-                source.AppendLine(")");
-                source.Append(branchIndent).AppendLine("{");
-                source.Append(branchIndent).Append("    result = ").Append(targetName).AppendLine(";");
-                source.Append(branchIndent).AppendLine("    return true;");
-                source.Append(branchIndent).AppendLine("}");
-            }
-
-            source.Append(branchIndent).AppendLine("break;");
-        }
-
-        source.Append(innerIndent).AppendLine("default:");
-        source.Append(branchIndent).AppendLine("break;");
-        source.Append(indent).AppendLine("}");
-
-        if (writeNoMatchTail)
-        {
-            source.AppendLine();
-            source.Append(indent).AppendLine("result = default!;");
-            source.Append(indent).AppendLine("return false;");
-        }
-    }
-
     private static void AppendStringSwitchBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel)
     {
         string indent = new(' ', indentLevel * 4);
@@ -1055,20 +947,6 @@ public sealed class EnumValueSourceGenerator : IIncrementalGenerator
         source.Append(innerIndent).AppendLine("    result = default!;");
         source.Append(innerIndent).AppendLine("    return false;");
         source.Append(indent).AppendLine("}");
-    }
-
-    private static void AppendSequenceEqualBody(StringBuilder source, List<(string ConstantName, string TargetName)> items, string inputIdentifier, int indentLevel)
-    {
-        string indent = new(' ', indentLevel * 4);
-
-        foreach ((string constantName, string targetName) in items)
-        {
-            source.Append(indent).Append("if (global::System.MemoryExtensions.SequenceEqual(").Append(inputIdentifier)
-                .Append(", ").Append(constantName).Append(")) { result = ").Append(targetName).AppendLine("; return true; }");
-        }
-
-        source.Append(indent).AppendLine("result = default!;");
-        source.Append(indent).AppendLine("return false;");
     }
 
     private static void AppendStringConstantSwitchBody(StringBuilder source, List<(string ConstantName, string TargetName)> items, string paramName, int indentLevel)

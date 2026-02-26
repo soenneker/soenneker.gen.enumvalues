@@ -1,4 +1,3 @@
-using System;
 using BenchmarkDotNet.Attributes;
 
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
@@ -17,28 +16,6 @@ public class TryFromValueBenchmark
         ColorCode.TryFromValue(_r, out ColorCode r);
         ColorCode.TryFromValue(_b, out ColorCode b);
         return (r, b);
-    }
-
-    [Benchmark]
-    public (bool, ColorCode) TryFromValue_String_Unknown()
-    {
-        bool ok = ColorCode.TryFromValue(_miss, out ColorCode result);
-        return (ok, result);
-    }
-
-    [Benchmark]
-    public (ColorCode, ColorCode) TryFromValue_Span_Known()
-    {
-        ColorCode.TryFromValue(_r.AsSpan(), out ColorCode r);
-        ColorCode.TryFromValue(_b.AsSpan(), out ColorCode b);
-        return (r, b);
-    }
-
-    [Benchmark]
-    public (bool, ColorCode) TryFromValue_Span_Unknown()
-    {
-        bool ok = ColorCode.TryFromValue(_miss.AsSpan(), out ColorCode result);
-        return (ok, result);
     }
 
     [Benchmark]

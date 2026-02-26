@@ -1,5 +1,3 @@
-using Soenneker.Gen.EnumValues;
-
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
 
 /// <summary>
