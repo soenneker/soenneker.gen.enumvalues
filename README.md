@@ -124,7 +124,7 @@ public sealed partial class SortDirection
 }
 ```
 
-`SortDirection` then has five instances: `Ascending`, `Descending` (own), then `Default`, `Auto`, `None` (from `CommonKeyword`). The generator emits static readonly fields for included instances (e.g. `SortDirection.Default`), so `List`, `All`, `TryFromValue`, `TryFromName`, and JSON work for both own and included values.
+`SortDirection` then has five instances: `Ascending`, `Descending` (own), then `Default`, `Auto`, `None` (from `CommonKeyword`). The generator emits static readonly fields for included instances (e.g. `SortDirection.Default`), so `List`, `Values`, `TryFromValue`, `TryFromName`, and JSON work for both own and included values.
 
 **Requirements**
 

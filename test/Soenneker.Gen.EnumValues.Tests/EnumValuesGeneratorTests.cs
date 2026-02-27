@@ -412,7 +412,7 @@ public sealed class EnumValuesGeneratorTests
     public void IncludeEnumValues_List_contains_own_then_included_in_order()
     {
         BoxShadowKeyword.List.Count.Should().Be(5); // None, Inset (own) + Initial, Inherit, Unset (from GlobalKeyword)
-        BoxShadowKeyword.All.Length.Should().Be(5);
+        BoxShadowKeyword.Values.Length.Should().Be(5);
 
         BoxShadowKeyword.List[0].Should().BeSameAs(BoxShadowKeyword.None);
         BoxShadowKeyword.List[1].Should().BeSameAs(BoxShadowKeyword.Inset);

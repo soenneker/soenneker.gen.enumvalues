@@ -209,7 +209,7 @@ public sealed partial class EnumValueSourceGenerator
         if (emittedInstance)
             source.AppendLine();
 
-        source.Append("    private static readonly ").Append(ctx.EnumTypeName).Append("[] __all = new[] { ");
+        source.Append("    private static readonly ").Append(ctx.EnumTypeName).Append("[] __values = new[] { ");
         for (var i = 0; i < ctx.Instances.Count; i++)
         {
             if (i > 0) source.Append(", ");
@@ -218,11 +218,11 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine(" };");
         source.AppendLine();
         AppendXmlSummary(source, "    ", "Gets a span of all defined instances.");
-        source.Append("    public static global::System.ReadOnlySpan<").Append(ctx.EnumTypeName).AppendLine("> All => __all;");
+        source.Append("    public static global::System.ReadOnlySpan<").Append(ctx.EnumTypeName).AppendLine("> Values => __values;");
         source.AppendLine();
 
         AppendXmlSummary(source, "    ", "Gets a read-only list of all defined instances.");
-        source.Append("    public static global::System.Collections.Generic.IReadOnlyList<").Append(ctx.EnumTypeName).AppendLine("> List => __all;");
+        source.Append("    public static global::System.Collections.Generic.IReadOnlyList<").Append(ctx.EnumTypeName).AppendLine("> List => __values;");
         source.AppendLine();
     }
 
@@ -231,14 +231,14 @@ public sealed partial class EnumValueSourceGenerator
         if (ctx.IsStringValue)
         {
             AppendXmlSummary(source, "    ", "Tries to parse a value from the specified span.");
-            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining | global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]");
             source.Append("    public static bool TryFromValue(global::System.ReadOnlySpan<char> value, out ").Append(ctx.EnumTypeName).AppendLine(" result)");
             source.AppendLine("    {");
             AppendSpanFirstCharSwitchBody(source, ctx.ValueSpanItems, "value", 2);
             source.AppendLine("    }");
             source.AppendLine();
             AppendXmlSummary(source, "    ", "Tries to parse a value from the specified string.");
-            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining | global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]");
             source.Append("    public static bool TryFromValue(string? value, out ").Append(ctx.EnumTypeName).AppendLine(" result)");
             source.AppendLine("    {");
             source.AppendLine("        if (value is null) { result = default!; return false; }");
@@ -251,7 +251,7 @@ public sealed partial class EnumValueSourceGenerator
         else
         {
             AppendXmlSummary(source, "    ", "Tries to parse a value from the specified value.");
-            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining | global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]");
             source.Append("    public static bool TryFromValue(").Append(ctx.ValueTryFromSignature).Append(", out ").Append(ctx.EnumTypeName).AppendLine(" result)");
             source.AppendLine("    {");
             source.AppendLine("        switch (value)");
@@ -280,14 +280,14 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine();
 
         AppendXmlSummary(source, "    ", "Tries to parse an instance from the specified name span.");
-        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining | global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]");
         source.Append("    public static bool TryFromName(global::System.ReadOnlySpan<char> name, out ").Append(ctx.EnumTypeName).AppendLine(" result)");
         source.AppendLine("    {");
         AppendSpanFirstCharSwitchBody(source, ctx.NameSpanItems, "name", 2);
         source.AppendLine("    }");
         source.AppendLine();
         AppendXmlSummary(source, "    ", "Tries to parse an instance from the specified name.");
-        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining | global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]");
         source.Append("    public static bool TryFromName(string? name, out ").Append(ctx.EnumTypeName).AppendLine(" result)");
         source.AppendLine("    {");
         source.AppendLine("        if (name is null) { result = default!; return false; }");
