@@ -12,7 +12,7 @@ public class BenchmarkRunner : BenchmarkTest
     {
     }
 
- //   [Fact]
+   // [Fact]
     public async ValueTask EnumValuesListBenchmark()
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<EnumValuesListBenchmark>(DefaultConf);
@@ -20,7 +20,7 @@ public class BenchmarkRunner : BenchmarkTest
         await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
     }
 
-    // [Fact]
+   // [Fact]
     public async ValueTask TryFromNameBenchmark()
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<TryFromNameBenchmark>(DefaultConf);
@@ -28,7 +28,7 @@ public class BenchmarkRunner : BenchmarkTest
         await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
     }
 
-    //  [Fact]
+  //  [Fact]
     public async ValueTask TryFromValueBenchmark()
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<TryFromValueBenchmark>(DefaultConf);
@@ -36,7 +36,7 @@ public class BenchmarkRunner : BenchmarkTest
         await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
     }
 
-    // [Fact]
+   // [Fact]
     public async ValueTask SerializationBenchmark()
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<SerializationBenchmark>(DefaultConf);

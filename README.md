@@ -96,6 +96,46 @@ After that, both serializers round-trip by `Value`.
 
 `Value` and the value constructor are generated automatically if they do not already exist.
 
+## Composing types with `[IncludeEnumValues]`
+
+You can reuse instances from another enum-value type by adding `[IncludeEnumValues(typeof(SourceType))]`. The generator merges your type’s own static instances with all instances from the source type. Order is deterministic: your own instances first (source order), then each included type’s instances in attribute order and source order.
+
+**Example: source type**
+
+```csharp
+[EnumValue<string>]
+public sealed partial class CommonKeyword
+{
+    public static readonly CommonKeyword Default = new("default");
+    public static readonly CommonKeyword Auto = new("auto");
+    public static readonly CommonKeyword None = new("none");
+}
+```
+
+**Example: composed type**
+
+```csharp
+[EnumValue<string>]
+[IncludeEnumValues(typeof(CommonKeyword))]
+public sealed partial class SortDirection
+{
+    public static readonly SortDirection Ascending = new("asc");
+    public static readonly SortDirection Descending = new("desc");
+}
+```
+
+`SortDirection` then has five instances: `Ascending`, `Descending` (own), then `Default`, `Auto`, `None` (from `CommonKeyword`). The generator emits static readonly fields for included instances (e.g. `SortDirection.Default`), so `List`, `All`, `TryFromValue`, `TryFromName`, and JSON work for both own and included values.
+
+**Requirements**
+
+- The source type must be an enum-value type: `[EnumValue]` or `[EnumValue<T>]` with the **same** value type as the target (e.g. both `[EnumValue<string>]`).
+- You can use multiple `[IncludeEnumValues(typeof(A))]`, `[IncludeEnumValues(typeof(B))]`; instances are merged in attribute order.
+
+**Collisions**
+
+- **Value collision:** If the same value appears in both the target and an included type, or in two included types, the generator reports an error (e.g. *Duplicate enum value 'none' in SortDirection from CommonKeyword*).
+- **Name collision:** If the target (or an earlier included type) already has a member with the same name as an included instance, the generator reports an error (e.g. *Member name 'None' in SortDirection conflicts with included member from CommonKeyword*).
+
 ## Notes
 
 - The enum type must be `partial`.

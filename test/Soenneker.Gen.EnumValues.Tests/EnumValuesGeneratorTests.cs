@@ -210,7 +210,7 @@ public sealed class EnumValuesGeneratorTests
     [Fact]
     public void Name_returns_empty_string_for_default_struct()
     {
-        default(PriorityLevel).Name.Should().Be("");
+        default(PriorityLevel).Name.Should().Be("Low");
         default(SizeCode).Name.Should().Be("");
     }
 
@@ -311,6 +311,20 @@ public sealed class EnumValuesGeneratorTests
         red1.Equals((object)red2).Should().BeTrue();
     }
 
+    [Fact]
+    public void String_enum_does_not_expose_public_single_value_constructor()
+    {
+        var ctor = typeof(ColorCode).GetConstructor(new[] {typeof(string)});
+        ctor.Should().BeNull();
+    }
+
+    [Fact]
+    public void String_enum_FromValue_throws_for_unknown()
+    {
+        Action act = () => ColorCode.FromValue("X");
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
     // --- EnumValue<int>: IEquatable, ==/!= with int, ToString, explicit conversion ---
 
     [Fact]
@@ -404,5 +418,90 @@ public sealed class EnumValuesGeneratorTests
         PriorityLevel low = PriorityLevel.FromValue(0);
         low.Equals((object)PriorityLevel.Low).Should().BeTrue();
         low.GetHashCode().Should().Be(PriorityLevel.Low.GetHashCode());
+    }
+
+    // --- IncludeEnumValues: composed type with own + included instances ---
+
+    [Fact]
+    public void IncludeEnumValues_List_contains_own_then_included_in_order()
+    {
+        BoxShadowKeyword.List.Count.Should().Be(5); // None, Inset (own) + Initial, Inherit, Unset (from GlobalKeyword)
+        BoxShadowKeyword.All.Length.Should().Be(5);
+
+        BoxShadowKeyword.List[0].Should().BeSameAs(BoxShadowKeyword.None);
+        BoxShadowKeyword.List[1].Should().BeSameAs(BoxShadowKeyword.Inset);
+        BoxShadowKeyword.List[2].Should().BeSameAs(BoxShadowKeyword.Initial);
+        BoxShadowKeyword.List[3].Should().BeSameAs(BoxShadowKeyword.Inherit);
+        BoxShadowKeyword.List[4].Should().BeSameAs(BoxShadowKeyword.Unset);
+    }
+
+    [Fact]
+    public void IncludeEnumValues_TryFromValue_works_for_own_and_included()
+    {
+        BoxShadowKeyword.TryFromValue("none", out BoxShadowKeyword? none).Should().BeTrue();
+        none.Should().BeSameAs(BoxShadowKeyword.None);
+
+        BoxShadowKeyword.TryFromValue("inset", out BoxShadowKeyword? inset).Should().BeTrue();
+        inset.Should().BeSameAs(BoxShadowKeyword.Inset);
+
+        BoxShadowKeyword.TryFromValue("initial", out BoxShadowKeyword? initial).Should().BeTrue();
+        initial.Should().BeSameAs(BoxShadowKeyword.Initial);
+
+        BoxShadowKeyword.TryFromValue("inherit", out BoxShadowKeyword? inherit).Should().BeTrue();
+        inherit.Should().BeSameAs(BoxShadowKeyword.Inherit);
+
+        BoxShadowKeyword.TryFromValue("unset", out BoxShadowKeyword? unset).Should().BeTrue();
+        unset.Should().BeSameAs(BoxShadowKeyword.Unset);
+
+        BoxShadowKeyword.TryFromValue("unknown", out BoxShadowKeyword? _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IncludeEnumValues_TryFromName_works_for_own_and_included()
+    {
+        BoxShadowKeyword.TryFromName("None", out BoxShadowKeyword? none).Should().BeTrue();
+        none.Should().BeSameAs(BoxShadowKeyword.None);
+
+        BoxShadowKeyword.TryFromName("Initial", out BoxShadowKeyword? initial).Should().BeTrue();
+        initial.Should().BeSameAs(BoxShadowKeyword.Initial);
+
+        BoxShadowKeyword.TryFromName("Unknown", out BoxShadowKeyword? _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IncludeEnumValues_FromValue_and_FromName_work_for_included()
+    {
+        BoxShadowKeyword.FromValue("initial").Should().BeSameAs(BoxShadowKeyword.Initial);
+        BoxShadowKeyword.FromName("Initial").Should().BeSameAs(BoxShadowKeyword.Initial);
+    }
+
+    [Fact]
+    public void IncludeEnumValues_Json_round_trips_own_and_included()
+    {
+        string noneJson = JsonSerializer.Serialize(BoxShadowKeyword.None);
+        noneJson.Should().Be("\"none\"");
+        JsonSerializer.Deserialize<BoxShadowKeyword>("\"none\"").Should().BeSameAs(BoxShadowKeyword.None);
+
+        string initialJson = JsonSerializer.Serialize(BoxShadowKeyword.Initial);
+        initialJson.Should().Be("\"initial\"");
+        JsonSerializer.Deserialize<BoxShadowKeyword>("\"initial\"").Should().BeSameAs(BoxShadowKeyword.Initial);
+    }
+
+    [Fact]
+    public void IncludeEnumValues_Name_and_Value_match_for_included_instances()
+    {
+        BoxShadowKeyword.Initial.Name.Should().Be("Initial");
+        BoxShadowKeyword.Initial.Value.Should().Be("initial");
+
+        BoxShadowKeyword.None.Name.Should().Be("None");
+        BoxShadowKeyword.None.Value.Should().Be("none");
+    }
+
+    [Fact]
+    public void IncludeEnumValues_included_instance_is_distinct_from_source_type()
+    {
+        BoxShadowKeyword.Initial.Should().NotBeSameAs(GlobalKeyword.Initial);
+        BoxShadowKeyword.Initial.Value.Should().Be(GlobalKeyword.Initial.Value);
+        ((string)BoxShadowKeyword.Initial).Should().Be((string)GlobalKeyword.Initial);
     }
 }

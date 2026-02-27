@@ -19,13 +19,13 @@ public class EnumValuesListBenchmark
         return ColorCodeSmartEnum.List.ToList();
     }
 
-    // [Benchmark]
-    public System.Collections.Generic.IReadOnlyList<ColorCodeIntellenum> Intellenum_Small()
+    [Benchmark]
+    public System.Collections.Generic.IEnumerable<ColorCodeIntellenum> Intellenum_Small()
     {
-        return ColorCodeIntellenum.List;
+        return ColorCodeIntellenum.List();
     }
 
-    [Benchmark]
+    //[Benchmark]
     public System.Collections.Generic.IReadOnlyList<ColorCodeLarge> GenEnumValues_Large()
     {
         return ColorCodeLarge.List;
