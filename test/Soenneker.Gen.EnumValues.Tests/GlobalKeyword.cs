@@ -6,7 +6,7 @@ namespace Soenneker.Gen.EnumValues.Tests;
 [EnumValue<string>]
 public sealed partial class GlobalKeyword
 {
-    public static readonly GlobalKeyword Initial = new("initial", 1);
-    public static readonly GlobalKeyword Inherit = new("inherit", 2);
-    public static readonly GlobalKeyword Unset = new("unset", 3);
+    public static readonly GlobalKeyword Initial = new("initial");
+    public static readonly GlobalKeyword Inherit = new("inherit");
+    public static readonly GlobalKeyword Unset = new("unset");
 }

@@ -1,4 +1,3 @@
-using Microsoft.CodeAnalysis;
 using System.Text;
 using Soenneker.Gen.EnumValues.Dtos;
 
@@ -27,11 +26,30 @@ public sealed partial class EnumValueSourceGenerator
     private static void AppendValueNameConstructorsAndName(StringBuilder source, in EnumSourceBuildContext ctx)
     {
         bool useId = ctx.UseIdBacking;
+        bool storeValue = useId && ctx.EnumType.IsReferenceType;
+        bool storeName = useId && ctx.EnumType.IsReferenceType;
+        bool valuePropertyGenerated = !ctx.HasValueProperty;
 
-        if (!ctx.HasValueProperty)
+        if (valuePropertyGenerated)
         {
             AppendXmlSummary(source, "    ", "Gets the underlying value of this instance.");
-            source.Append("    public ").Append(ctx.ValueTypeName).AppendLine(" Value { get; }");
+            if (useId && !storeValue)
+            {
+                source.Append("    public ").Append(ctx.ValueTypeName).AppendLine(" Value => _id switch");
+                source.AppendLine("    {");
+                for (var i = 0; i < ctx.Instances.Count; i++)
+                {
+                    byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
+                    string valueConst = ctx.Instances[i].Name + "Value";
+                    source.Append("        ").Append(instanceId).Append(" => ").Append(valueConst).AppendLine(",");
+                }
+                source.AppendLine("        _ => \"\"");
+                source.AppendLine("    };");
+            }
+            else
+            {
+                source.Append("    public ").Append(ctx.ValueTypeName).AppendLine(" Value { get; }");
+            }
             source.AppendLine();
         }
 
@@ -48,9 +66,26 @@ public sealed partial class EnumValueSourceGenerator
                 source.Append("    private ").Append(ctx.EnumType.Name).Append("(").Append(ctx.ValueTypeName).Append(" value, byte id)");
                 source.AppendLine();
                 source.AppendLine("    {");
-                source.AppendLine("        Value = value;");
+                if (storeValue && valuePropertyGenerated)
+                    source.AppendLine("        Value = value;");
                 source.AppendLine("        _id = id;");
+                if (!ctx.HasNameProperty && storeName)
+                {
+                    source.AppendLine("        Name = id switch");
+                    source.AppendLine("        {");
+                    for (var i = 0; i < ctx.Instances.Count; i++)
+                    {
+                        byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
+                        string nameConst = ctx.Instances[i].Name + "Name";
+                        source.Append("            ").Append(instanceId).Append(" => ").Append(nameConst).AppendLine(",");
+                    }
+                    source.AppendLine("            _ => \"\"");
+                    source.AppendLine("        };");
+                }
                 source.AppendLine("    }");
+                source.AppendLine();
+                AppendIdFromValueMethod(source, ctx);
+                source.Append("    private ").Append(ctx.EnumType.Name).Append("(").Append(ctx.ValueTypeName).Append(" value) : this(value, __idFromValue(value)) { }");
                 source.AppendLine();
             }
             else
@@ -64,16 +99,23 @@ public sealed partial class EnumValueSourceGenerator
         if (!ctx.HasNameProperty && useId)
         {
             AppendXmlSummary(source, "    ", "Gets the name of this instance.");
-            source.AppendLine("    public string Name => _id switch");
-            source.AppendLine("    {");
-            for (var i = 0; i < ctx.Instances.Count; i++)
+            if (storeName)
             {
-                byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
-                string nameConst = ctx.Instances[i].Name + "Name";
-                source.Append("        ").Append(instanceId).Append(" => ").Append(nameConst).AppendLine(",");
+                source.AppendLine("    public string Name { get; }");
             }
-            source.AppendLine("        _ => \"\"");
-            source.AppendLine("    };");
+            else
+            {
+                source.AppendLine("    public string Name => _id switch");
+                source.AppendLine("    {");
+                for (var i = 0; i < ctx.Instances.Count; i++)
+                {
+                    byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
+                    string nameConst = ctx.Instances[i].Name + "Name";
+                    source.Append("        ").Append(instanceId).Append(" => ").Append(nameConst).AppendLine(",");
+                }
+                source.AppendLine("        _ => \"\"");
+                source.AppendLine("    };");
+            }
             source.AppendLine();
         }
         else if (!ctx.HasNameProperty && !useId)
@@ -96,6 +138,23 @@ public sealed partial class EnumValueSourceGenerator
             source.AppendLine("     : \"\";");
             source.AppendLine();
         }
+    }
+
+    private static void AppendIdFromValueMethod(StringBuilder source, in EnumSourceBuildContext ctx)
+    {
+        source.Append("    private static byte __idFromValue(").Append(ctx.ValueTypeName).AppendLine(" value) => value switch");
+        source.AppendLine("    {");
+        for (var i = 0; i < ctx.Instances.Count; i++)
+        {
+            byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
+            string caseExpr = ctx.IsStringValue
+                ? "\"" + EscapeString(ctx.Instances[i].StringValue ?? "") + "\""
+                : ctx.Instances[i].ValueLiteral;
+            source.Append("        ").Append(caseExpr).Append(" => ").Append(instanceId).AppendLine(",");
+        }
+        source.AppendLine("        _ => throw new global::System.ArgumentOutOfRangeException(nameof(value), value, \"Unknown enum value.\")");
+        source.AppendLine("    };");
+        source.AppendLine();
     }
 
     private static void AppendConstantsAllAndList(StringBuilder source, in EnumSourceBuildContext ctx)
@@ -288,7 +347,7 @@ public sealed partial class EnumValueSourceGenerator
                 {
                     byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
                     string valueConst = ctx.Instances[i].Name + "Value";
-                    source.Append("        ").Append(instanceId).Append(" => global::System.String.Equals(other, ").Append(valueConst).AppendLine(", global::System.StringComparison.Ordinal),");
+                    source.Append("        ").Append(instanceId).Append(" => other == ").Append(valueConst).AppendLine(",");
                 }
                 source.AppendLine("        _ => false");
                 source.AppendLine("    };");
@@ -318,7 +377,7 @@ public sealed partial class EnumValueSourceGenerator
                 {
                     byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
                     string valueConst = ctx.Instances[i].Name + "Value";
-                    source.Append("        ").Append(instanceId).Append(" => global::System.String.Equals(other, ").Append(valueConst).AppendLine(", global::System.StringComparison.Ordinal),");
+                    source.Append("        ").Append(instanceId).Append(" => other == ").Append(valueConst).AppendLine(",");
                 }
                 source.AppendLine("        _ => false");
                 source.AppendLine("    };");

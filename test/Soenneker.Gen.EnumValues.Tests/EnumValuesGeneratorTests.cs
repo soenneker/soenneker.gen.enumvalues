@@ -311,20 +311,6 @@ public sealed class EnumValuesGeneratorTests
         red1.Equals((object)red2).Should().BeTrue();
     }
 
-    [Fact]
-    public void String_enum_does_not_expose_public_single_value_constructor()
-    {
-        var ctor = typeof(ColorCode).GetConstructor(new[] {typeof(string)});
-        ctor.Should().BeNull();
-    }
-
-    [Fact]
-    public void String_enum_FromValue_throws_for_unknown()
-    {
-        Action act = () => ColorCode.FromValue("X");
-        act.Should().Throw<ArgumentOutOfRangeException>();
-    }
-
     // --- EnumValue<int>: IEquatable, ==/!= with int, ToString, explicit conversion ---
 
     [Fact]

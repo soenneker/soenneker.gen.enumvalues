@@ -28,6 +28,10 @@
         <PackageReference Include="AwesomeAssertions" Version="9.4.0" />
         <PackageReference Include="Intellenum" Version="2.0.1" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+        <PackageReference Include="Soenneker.Gen.Adapt" Version="4.0.62">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
         <PackageReference Include="Soenneker.Tests.Benchmark" Version="4.0.63" />
         <PackageReference Include="xUnit.v3" Version="3.2.2" />
     </ItemGroup>
