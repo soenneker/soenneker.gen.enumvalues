@@ -113,11 +113,11 @@ public sealed partial class EnumValueSourceGenerator
                 if (!fieldSymbol.IsStatic || !SymbolEqualityComparer.Default.Equals(fieldSymbol.Type, enumType))
                     continue;
 
-                if (TryGetValueLiteralFromField(compilation, fieldSymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation))
+                if (TryGetValueLiteralFromField(compilation, fieldSymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation, out string? valueJsonString))
                 {
                     if (ordinalErrorLocation is not null)
                         context.ReportDiagnostic(Diagnostic.Create(_ordinalNotAllowedDescriptor, ordinalErrorLocation, stringValue ?? valueLiteral ?? ""));
-                    result.Add(new EnumInstance(fieldSymbol.Name, valueLiteral!, stringValue, location ?? fieldSymbol.Locations.FirstOrDefault() ?? Location.None, id, sourceTypeName));
+                    result.Add(new EnumInstance(fieldSymbol.Name, valueLiteral!, stringValue, location ?? fieldSymbol.Locations.FirstOrDefault() ?? Location.None, id, sourceTypeName, valueJsonString));
                 }
             }
             else if (member is IPropertySymbol propertySymbol)
@@ -125,11 +125,11 @@ public sealed partial class EnumValueSourceGenerator
                 if (!propertySymbol.IsStatic || !SymbolEqualityComparer.Default.Equals(propertySymbol.Type, enumType))
                     continue;
 
-                if (TryGetValueLiteralFromProperty(compilation, propertySymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation))
+                if (TryGetValueLiteralFromProperty(compilation, propertySymbol, valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation, out string? valueJsonString))
                 {
                     if (ordinalErrorLocation is not null)
                         context.ReportDiagnostic(Diagnostic.Create(_ordinalNotAllowedDescriptor, ordinalErrorLocation, stringValue ?? valueLiteral ?? ""));
-                    result.Add(new EnumInstance(propertySymbol.Name, valueLiteral!, stringValue, location ?? propertySymbol.Locations.FirstOrDefault() ?? Location.None, id, sourceTypeName));
+                    result.Add(new EnumInstance(propertySymbol.Name, valueLiteral!, stringValue, location ?? propertySymbol.Locations.FirstOrDefault() ?? Location.None, id, sourceTypeName, valueJsonString));
                 }
             }
         }
@@ -139,13 +139,14 @@ public sealed partial class EnumValueSourceGenerator
         return result;
     }
 
-    private static bool TryGetValueLiteralFromField(Compilation compilation, IFieldSymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation)
+    private static bool TryGetValueLiteralFromField(Compilation compilation, IFieldSymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation, out string? valueJsonString)
     {
         valueLiteral = null;
         stringValue = null;
         location = null;
         id = null;
         ordinalErrorLocation = null;
+        valueJsonString = null;
 
         foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
         {
@@ -158,7 +159,7 @@ public sealed partial class EnumValueSourceGenerator
 
             SemanticModel semanticModel = compilation.GetSemanticModel(initializer.SyntaxTree);
 
-            if (TryGetValueLiteralFromInitializer(semanticModel, initializer.Value, valueType, out valueLiteral, out stringValue, out id, out bool hasExplicitOrdinal))
+            if (TryGetValueLiteralFromInitializer(semanticModel, initializer.Value, valueType, out valueLiteral, out stringValue, out id, out bool hasExplicitOrdinal, out valueJsonString))
             {
                 location = initializer.GetLocation();
                 if (hasExplicitOrdinal)
@@ -170,13 +171,14 @@ public sealed partial class EnumValueSourceGenerator
         return false;
     }
 
-    private static bool TryGetValueLiteralFromProperty(Compilation compilation, IPropertySymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation)
+    private static bool TryGetValueLiteralFromProperty(Compilation compilation, IPropertySymbol symbol, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out Location? location, out byte? id, out Location? ordinalErrorLocation, out string? valueJsonString)
     {
         valueLiteral = null;
         stringValue = null;
         location = null;
         id = null;
         ordinalErrorLocation = null;
+        valueJsonString = null;
 
         foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
         {
@@ -190,7 +192,7 @@ public sealed partial class EnumValueSourceGenerator
 
             SemanticModel semanticModel = compilation.GetSemanticModel(expression.SyntaxTree);
 
-            if (TryGetValueLiteralFromInitializer(semanticModel, expression, valueType, out valueLiteral, out stringValue, out id, out bool hasExplicitOrdinal))
+            if (TryGetValueLiteralFromInitializer(semanticModel, expression, valueType, out valueLiteral, out stringValue, out id, out bool hasExplicitOrdinal, out valueJsonString))
             {
                 location = expression.GetLocation();
                 if (hasExplicitOrdinal)
@@ -202,12 +204,13 @@ public sealed partial class EnumValueSourceGenerator
         return false;
     }
 
-    private static bool TryGetValueLiteralFromInitializer(SemanticModel semanticModel, ExpressionSyntax initializerExpression, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out byte? id, out bool hasExplicitOrdinal)
+    private static bool TryGetValueLiteralFromInitializer(SemanticModel semanticModel, ExpressionSyntax initializerExpression, INamedTypeSymbol valueType, out string? valueLiteral, out string? stringValue, out byte? id, out bool hasExplicitOrdinal, out string? valueJsonString)
     {
         valueLiteral = null;
         stringValue = null;
         id = null;
         hasExplicitOrdinal = false;
+        valueJsonString = null;
 
         ArgumentListSyntax? argumentList = initializerExpression switch
         {
@@ -249,6 +252,7 @@ public sealed partial class EnumValueSourceGenerator
         if (!TryFormatLiteral(converted, valueType, out valueLiteral))
             return false;
 
+        TryGetValueJsonString(converted, valueType, out valueJsonString);
         stringValue = converted as string;
         return true;
     }
@@ -310,6 +314,43 @@ public sealed partial class EnumValueSourceGenerator
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>Gets the invariant string form of the value for JSON property names (no C# suffix like L, U).</summary>
+    private static bool TryGetValueJsonString(object? value, ITypeSymbol valueType, out string? jsonString)
+    {
+        jsonString = null;
+        if (value is null)
+            return false;
+        switch (valueType.SpecialType)
+        {
+            case SpecialType.System_Int32:
+            case SpecialType.System_Int64:
+            case SpecialType.System_Int16:
+            case SpecialType.System_SByte:
+            case SpecialType.System_Byte:
+            case SpecialType.System_UInt16:
+            case SpecialType.System_UInt32:
+            case SpecialType.System_UInt64:
+                jsonString = Convert.ToString(value, CultureInfo.InvariantCulture);
+                return jsonString is not null;
+            case SpecialType.System_String:
+                jsonString = (string?)value;
+                return jsonString is not null;
+            case SpecialType.System_Boolean:
+                jsonString = (bool)value ? "true" : "false";
+                return true;
+            case SpecialType.System_Char:
+                jsonString = new string((char)value, 1);
+                return true;
+            default:
+                if (valueType.ToDisplayString() == "System.Guid")
+                {
+                    jsonString = ((Guid)value).ToString();
+                    return true;
+                }
+                return false;
         }
     }
 

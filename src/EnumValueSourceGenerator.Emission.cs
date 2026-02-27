@@ -142,6 +142,7 @@ public sealed partial class EnumValueSourceGenerator
 
     private static void AppendIdFromValueMethod(StringBuilder source, in EnumSourceBuildContext ctx)
     {
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]");
         source.Append("    private static byte __idFromValue(").Append(ctx.ValueTypeName).AppendLine(" value) => value switch");
         source.AppendLine("    {");
         for (var i = 0; i < ctx.Instances.Count; i++)
@@ -310,6 +311,7 @@ public sealed partial class EnumValueSourceGenerator
         AppendIsDefinedIsNameDefined(source, ctx.EnumTypeName, ctx.ValueTypeName, ctx.IsStringValue);
         source.AppendLine();
         AppendXmlSummary(source, "    ", "Deconstructs this instance into its name and value.");
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
         source.Append("    public void Deconstruct(out string name, out ").Append(ctx.ValueTypeName).AppendLine(" value)");
         source.AppendLine("    {");
         source.AppendLine("        name = Name;");
@@ -330,16 +332,22 @@ public sealed partial class EnumValueSourceGenerator
             source.AppendLine();
             if (useId && ctx.EnumType.IsReferenceType)
             {
+                AppendXmlSummary(source, "    ", "Determines whether the specified object is equal to this instance.");
+                source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public override bool Equals(object? obj)");
                 source.Append("        => obj is ").Append(ctx.EnumTypeName).AppendLine(" other && _id == other._id;");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Indicates whether the current instance is equal to another instance of the same type.");
                 source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.Append("    public bool Equals(").Append(ctx.EnumTypeName).AppendLine("? other)");
                 source.AppendLine("        => other is not null && _id == other._id;");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a hash code for this instance.");
+                source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public override int GetHashCode()");
                 source.AppendLine("        => _id;");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Indicates whether this instance's value equals the specified string (ordinal comparison).");
                 source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public bool Equals(string? other) => _id switch");
                 source.AppendLine("    {");
@@ -352,24 +360,32 @@ public sealed partial class EnumValueSourceGenerator
                 source.AppendLine("        _ => false");
                 source.AppendLine("    };");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are equal.");
                 source.Append("    public static bool operator ==(").Append(ctx.EnumTypeName).Append("? left, ").Append(ctx.EnumTypeName).AppendLine("? right)");
                 source.AppendLine("        => global::System.Object.ReferenceEquals(left, right) || (left is not null && right is not null && left._id == right._id);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are not equal.");
                 source.Append("    public static bool operator !=(").Append(ctx.EnumTypeName).Append("? left, ").Append(ctx.EnumTypeName).AppendLine("? right)");
                 source.AppendLine("        => !(left == right);");
             }
             else if (useId && !ctx.EnumType.IsReferenceType)
             {
+                AppendXmlSummary(source, "    ", "Determines whether the specified object is equal to this instance.");
+                source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public override bool Equals(object? obj)");
                 source.Append("        => obj is ").Append(ctx.EnumTypeName).AppendLine(" other && _id == other._id;");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Indicates whether the current instance is equal to another instance of the same type.");
                 source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.Append("    public bool Equals(").Append(ctx.EnumTypeName).AppendLine(" other)");
                 source.AppendLine("        => _id == other._id;");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a hash code for this instance.");
+                source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public override int GetHashCode()");
                 source.AppendLine("        => _id;");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Indicates whether this instance's value equals the specified string (ordinal comparison).");
                 source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public bool Equals(string? other) => _id switch");
                 source.AppendLine("    {");
@@ -382,62 +398,83 @@ public sealed partial class EnumValueSourceGenerator
                 source.AppendLine("        _ => false");
                 source.AppendLine("    };");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are equal.");
                 source.Append("    public static bool operator ==(").Append(ctx.EnumTypeName).Append(" left, ").Append(ctx.EnumTypeName).AppendLine(" right)");
                 source.AppendLine("        => left._id == right._id;");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are not equal.");
                 source.Append("    public static bool operator !=(").Append(ctx.EnumTypeName).Append(" left, ").Append(ctx.EnumTypeName).AppendLine(" right)");
                 source.AppendLine("        => left._id != right._id;");
             }
             else if (ctx.EnumType.IsReferenceType)
             {
+                AppendXmlSummary(source, "    ", "Determines whether the specified object is equal to this instance.");
+                source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public override bool Equals(object? obj)");
                 source.Append("        => obj is ").Append(ctx.EnumTypeName).AppendLine(" other && global::System.String.Equals(Value, other.Value, global::System.StringComparison.Ordinal);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a hash code for this instance.");
+                source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public override int GetHashCode()");
                 source.AppendLine("        => global::System.StringComparer.Ordinal.GetHashCode(Value);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Indicates whether the current instance is equal to another instance of the same type.");
                 source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.Append("    public bool Equals(").Append(ctx.EnumTypeName).AppendLine("? other)");
                 source.AppendLine("        => other is not null && global::System.String.Equals(Value, other.Value, global::System.StringComparison.Ordinal);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Indicates whether this instance's value equals the specified string (ordinal comparison).");
                 source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public bool Equals(string? other)");
                 source.AppendLine("        => global::System.String.Equals(Value, other, global::System.StringComparison.Ordinal);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are equal.");
                 source.Append("    public static bool operator ==(").Append(ctx.EnumTypeName).Append("? left, ").Append(ctx.EnumTypeName).AppendLine("? right)");
                 source.AppendLine("        => left is null ? right is null : right is not null && left.Equals(right);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are not equal.");
                 source.Append("    public static bool operator !=(").Append(ctx.EnumTypeName).Append("? left, ").Append(ctx.EnumTypeName).AppendLine("? right)");
                 source.AppendLine("        => !(left == right);");
             }
             else
             {
+                AppendXmlSummary(source, "    ", "Determines whether the specified object is equal to this instance.");
+                source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public override bool Equals(object? obj)");
                 source.Append("        => obj is ").Append(ctx.EnumTypeName).AppendLine(" other && global::System.String.Equals(Value, other.Value, global::System.StringComparison.Ordinal);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a hash code for this instance.");
+                source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public override int GetHashCode()");
                 source.AppendLine("        => global::System.StringComparer.Ordinal.GetHashCode(Value);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Indicates whether the current instance is equal to another instance of the same type.");
                 source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.Append("    public bool Equals(").Append(ctx.EnumTypeName).AppendLine(" other)");
                 source.AppendLine("        => global::System.String.Equals(Value, other.Value, global::System.StringComparison.Ordinal);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Indicates whether this instance's value equals the specified string (ordinal comparison).");
                 source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
                 source.AppendLine("    public bool Equals(string? other)");
                 source.AppendLine("        => global::System.String.Equals(Value, other, global::System.StringComparison.Ordinal);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are equal.");
                 source.Append("    public static bool operator ==(").Append(ctx.EnumTypeName).Append(" left, ").Append(ctx.EnumTypeName).AppendLine(" right)");
                 source.AppendLine("        => left.Equals(right);");
                 source.AppendLine();
+                AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are not equal.");
                 source.Append("    public static bool operator !=(").Append(ctx.EnumTypeName).Append(" left, ").Append(ctx.EnumTypeName).AppendLine(" right)");
                 source.AppendLine("        => !left.Equals(right);");
             }
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns the name of this instance.");
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.AppendLine("    public override string ToString() => Name;");
             source.AppendLine();
         }
         else
         {
+            AppendXmlSummary(source, "    ", "Indicates whether the current instance is equal to another instance of the same type.");
             source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.Append("    public bool Equals(").Append(ctx.EnumTypeName).Append(ctx.EnumType.IsReferenceType ? "? " : " ");
             source.Append("other)");
@@ -446,34 +483,47 @@ public sealed partial class EnumValueSourceGenerator
             else
                 source.AppendLine(" => Value.Equals(other.Value);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Indicates whether the current instance's value equals the specified value.");
             source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.Append("    public bool Equals(").Append(ctx.ValueTypeName).AppendLine(" other)");
             source.AppendLine("        => Value.Equals(other);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Determines whether the specified object is equal to this instance.");
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.AppendLine("    public override bool Equals(object? obj)");
             source.Append("        => obj is ").Append(ctx.EnumTypeName).AppendLine(" other && Equals(other);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns a hash code for this instance.");
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.AppendLine("    public override int GetHashCode()");
             source.AppendLine("        => Value.GetHashCode();");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are equal.");
             source.Append("    public static bool operator ==(").Append(ctx.EnumTypeName).Append(" left, ").Append(ctx.EnumTypeName).AppendLine(" right)");
             source.AppendLine("        => left.Equals(right);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are not equal.");
             source.Append("    public static bool operator !=(").Append(ctx.EnumTypeName).Append(" left, ").Append(ctx.EnumTypeName).AppendLine(" right)");
             source.AppendLine("        => !left.Equals(right);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns a value that indicates whether an instance equals the specified value.");
             source.Append("    public static bool operator ==(").Append(ctx.EnumTypeName).Append(" left, ").Append(ctx.ValueTypeName).AppendLine(" right)");
             source.AppendLine("        => left.Value.Equals(right);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns a value that indicates whether an instance does not equal the specified value.");
             source.Append("    public static bool operator !=(").Append(ctx.EnumTypeName).Append(" left, ").Append(ctx.ValueTypeName).AppendLine(" right)");
             source.AppendLine("        => !left.Value.Equals(right);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns a value that indicates whether the specified value equals an instance.");
             source.Append("    public static bool operator ==(").Append(ctx.ValueTypeName).Append(" left, ").Append(ctx.EnumTypeName).AppendLine(" right)");
             source.AppendLine("        => right.Value.Equals(left);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns a value that indicates whether the specified value does not equal an instance.");
             source.Append("    public static bool operator !=(").Append(ctx.ValueTypeName).Append(" left, ").Append(ctx.EnumTypeName).AppendLine(" right)");
             source.AppendLine("        => !right.Value.Equals(left);");
             source.AppendLine();
+            AppendXmlSummary(source, "    ", "Returns the string representation of this instance.");
+            source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.AppendLine("    public override string ToString()");
             source.Append("        => ").Append(BuildToStringExpression(ctx.ValueType)).AppendLine(";");
             source.AppendLine();
@@ -555,16 +605,57 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine();
         source.Append("    public override ").Append(ctx.EnumTypeName).AppendLine(" ReadAsPropertyName(ref global::System.Text.Json.Utf8JsonReader reader, global::System.Type typeToConvert, global::System.Text.Json.JsonSerializerOptions options)");
         source.AppendLine("    {");
-        for (var i = 0; i < ctx.Instances.Count; i++)
+        if (ctx.IsStringValue)
         {
-            source.Append("        if (reader.ValueTextEquals(\"").Append(EscapeString(ctx.Instances[i].Name)).Append("\"u8)) return ")
-                .Append(ctx.EnumTypeName).Append(".").Append(ctx.Instances[i].Name).AppendLine(";");
+            for (var i = 0; i < ctx.Instances.Count; i++)
+            {
+                string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
+                source.Append("        if (reader.ValueTextEquals(\"").Append(EscapeString(jsonStr)).Append("\"u8)) return ")
+                    .Append(ctx.EnumTypeName).Append(".").Append(ctx.Instances[i].Name).AppendLine(";");
+            }
         }
-        source.AppendLine("        throw new global::System.Text.Json.JsonException(\"Unknown enum name.\");");
+        else
+        {
+            for (var i = 0; i < ctx.Instances.Count; i++)
+            {
+                string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
+                source.Append("        if (reader.ValueTextEquals(\"").Append(EscapeString(jsonStr)).Append("\"u8)) return ")
+                    .Append(ctx.EnumTypeName).Append(".").Append(ctx.Instances[i].Name).AppendLine(";");
+            }
+        }
+        source.AppendLine("        throw new global::System.Text.Json.JsonException(\"Unknown enum value.\");");
         source.AppendLine("    }");
         source.AppendLine();
         source.Append("    public override void WriteAsPropertyName(global::System.Text.Json.Utf8JsonWriter writer, ").Append(ctx.EnumTypeName).AppendLine(" value, global::System.Text.Json.JsonSerializerOptions options)");
-        source.AppendLine("        => writer.WritePropertyName(value.Name);");
+        if (ctx.IsStringValue)
+        {
+            source.AppendLine("    {");
+            string refOrEq = ctx.EnumType.IsReferenceType ? "global::System.Object.ReferenceEquals(value, " : "value == ";
+            string refOrEqSuffix = ctx.EnumType.IsReferenceType ? ")" : "";
+            for (var i = 0; i < ctx.Instances.Count; i++)
+            {
+                string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
+                source.Append("        if (").Append(refOrEq).Append(ctx.EnumTypeName).Append(".").Append(ctx.Instances[i].Name).Append(refOrEqSuffix)
+                    .Append(") { writer.WritePropertyName(\"").Append(EscapeString(jsonStr)).Append("\"u8); return; }").AppendLine();
+            }
+            source.AppendLine("        writer.WritePropertyName(value.Value);");
+            source.AppendLine("    }");
+        }
+        else
+        {
+            source.AppendLine("    {");
+            source.AppendLine("        switch (value.Value)");
+            source.AppendLine("        {");
+            for (var i = 0; i < ctx.Instances.Count; i++)
+            {
+                string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
+                source.Append("            case ").Append(ctx.Instances[i].ValueLiteral).Append(": writer.WritePropertyName(\"")
+                    .Append(EscapeString(jsonStr)).Append("\"u8); return;").AppendLine();
+            }
+            source.Append(BuildStjWritePropertyNameFallback(ctx.ValueType)).AppendLine();
+            source.AppendLine("        }");
+            source.AppendLine("    }");
+        }
         source.AppendLine("}");
     }
 

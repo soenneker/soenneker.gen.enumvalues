@@ -256,7 +256,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 
             List<EnumInstance> included = GatherInstancesFromType(context, compilation, sourceType, valueType, sourceType.Name);
             foreach (EnumInstance inst in included)
-                instances.Add(new EnumInstance(inst.Name, inst.ValueLiteral, inst.StringValue, inst.Location, id: null, inst.SourceTypeName));
+                instances.Add(new EnumInstance(inst.Name, inst.ValueLiteral, inst.StringValue, inst.Location, id: null, inst.SourceTypeName, inst.ValueJsonString));
         }
 
         if (instances.Count == 0)
@@ -650,6 +650,34 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         return "Value.ToString(global::System.Globalization.CultureInfo.InvariantCulture)!";
     }
 
+    /// <summary>Returns the default-case body for WriteAsPropertyName (unknown value): Utf8Formatter or ToString().</summary>
+    private static string BuildStjWritePropertyNameFallback(ITypeSymbol valueType)
+    {
+        int bufferSize = valueType.SpecialType switch
+        {
+            SpecialType.System_Int32 => 11,
+            SpecialType.System_Int64 => 20,
+            SpecialType.System_Int16 => 6,
+            SpecialType.System_Byte => 3,
+            SpecialType.System_SByte => 4,
+            SpecialType.System_UInt16 => 5,
+            SpecialType.System_UInt32 => 10,
+            SpecialType.System_UInt64 => 20,
+            _ => 0
+        };
+        if (bufferSize > 0)
+        {
+            return "            default:\n" +
+                   "                global::System.Span<byte> buf = stackalloc byte[" + bufferSize + "];\n" +
+                   "                if (!global::System.Buffers.Text.Utf8Formatter.TryFormat(value.Value, buf, out int written))\n" +
+                   "                    throw new global::System.Text.Json.JsonException(\"Unknown enum value.\");\n" +
+                   "                writer.WritePropertyName(buf[..written]);\n" +
+                   "                return;";
+        }
+        return "            default:\n" +
+               "                throw new global::System.Text.Json.JsonException(\"Unknown enum value.\");";
+    }
+
     private static bool CanEmitConstant(ITypeSymbol valueType)
     {
         switch (valueType.SpecialType)
@@ -677,20 +705,38 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 
                                            namespace Soenneker.Gen.EnumValues;
 
+                                           /// <summary>
+                                           /// Marks a class or struct for source generation of enum value helpers (names, values, try-from methods).
+                                           /// </summary>
                                            [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
                                            public sealed class EnumValueAttribute : global::System.Attribute
                                            {
                                            }
 
+                                           /// <summary>
+                                           /// Marks a class or struct for source generation of enum value helpers with a specific value type <typeparamref name="TValue"/>.
+                                           /// </summary>
+                                           /// <typeparam name="TValue">The type of the enum's underlying value (e.g. int, long, string).</typeparam>
                                            [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
                                            public sealed class EnumValueAttribute<TValue> : global::System.Attribute
                                            {
                                            }
 
+                                           /// <summary>
+                                           /// Includes enum members from another type in the generated values for the attributed type.
+                                           /// </summary>
                                            [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]
                                            public sealed class IncludeEnumValuesAttribute : global::System.Attribute
                                            {
+                                               /// <summary>
+                                               /// The type whose enum values are included (e.g. another enum or enum-value type).
+                                               /// </summary>
                                                public global::System.Type SourceType { get; }
+
+                                               /// <summary>
+                                               /// Includes enum values from the specified type.
+                                               /// </summary>
+                                               /// <param name="sourceType">The type to include values from.</param>
                                                public IncludeEnumValuesAttribute(global::System.Type sourceType) => SourceType = sourceType;
                                            }
                                            """;
