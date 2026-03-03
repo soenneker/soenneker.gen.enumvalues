@@ -97,9 +97,9 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        context.RegisterPostInitializationOutput(static ctx =>
+        context.RegisterSourceOutput(context.CompilationProvider, static (sourceProductionContext, compilation) =>
         {
-            ctx.AddSource("EnumValueAttributes.g.cs", SourceText.From(_attributeSource, Encoding.UTF8));
+            EmitAttributeSources(sourceProductionContext, compilation);
         });
 
         IncrementalValuesProvider<EnumTypeCandidate?> typeCandidates = context.SyntaxProvider.CreateSyntaxProvider(
@@ -143,48 +143,188 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         if (syntaxContext.SemanticModel.GetDeclaredSymbol(typeDeclaration) is not INamedTypeSymbol typeSymbol)
             return null;
 
-        ImmutableArray<AttributeData> attributes = typeSymbol.GetAttributes();
-
-        for (var i = 0; i < attributes.Length; i++)
+        SyntaxList<AttributeListSyntax> attributeLists = typeDeclaration.AttributeLists;
+        for (var i = 0; i < attributeLists.Count; i++)
         {
-            AttributeData attribute = attributes[i];
-            INamedTypeSymbol? attributeClass = attribute.AttributeClass;
-
-            if (attributeClass is null)
-                continue;
-
-            if (attributeClass.Name == "EnumValueAttribute" && attributeClass.Arity == 0)
+            SeparatedSyntaxList<AttributeSyntax> attributes = attributeLists[i].Attributes;
+            for (var j = 0; j < attributes.Count; j++)
             {
-                INamedTypeSymbol? intType = syntaxContext.SemanticModel.Compilation.GetTypeByMetadataName("System.Int32");
-                if (intType is null)
-                    return null;
+                AttributeSyntax attribute = attributes[j];
 
-                return new EnumTypeCandidate(typeSymbol, intType);
-            }
+                if (!TryGetEnumValueAttributeTypeSyntax(attribute, out TypeSyntax? genericArgTypeSyntax))
+                    continue;
 
-            if (attributeClass.Name == "EnumValueAttribute" && attributeClass.Arity == 1 && attributeClass.TypeArguments.Length == 1 &&
-                attributeClass.TypeArguments[0] is INamedTypeSymbol genericValueType)
-            {
-                return new EnumTypeCandidate(typeSymbol, genericValueType);
+                if (genericArgTypeSyntax is null)
+                {
+                    INamedTypeSymbol? intType = syntaxContext.SemanticModel.Compilation.GetTypeByMetadataName("System.Int32");
+                    if (intType is null)
+                        return null;
+
+                    return new EnumTypeCandidate(typeSymbol, intType);
+                }
+
+                ITypeSymbol? resolvedType = syntaxContext.SemanticModel.GetTypeInfo(genericArgTypeSyntax).Type;
+                if (resolvedType is INamedTypeSymbol genericValueType)
+                    return new EnumTypeCandidate(typeSymbol, genericValueType);
             }
         }
 
         return null;
     }
 
-    private static ImmutableArray<INamedTypeSymbol> GetIncludeEnumValuesSourceTypes(INamedTypeSymbol enumType)
+    private static bool TryGetEnumValueAttributeTypeSyntax(AttributeSyntax attribute, out TypeSyntax? genericArgTypeSyntax)
+    {
+        genericArgTypeSyntax = null;
+
+        SimpleNameSyntax? simpleName = attribute.Name switch
+        {
+            SimpleNameSyntax simple => simple,
+            QualifiedNameSyntax qualified => qualified.Right,
+            AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name,
+            _ => null
+        };
+
+        if (simpleName is null)
+            return false;
+
+        string identifier = simpleName.Identifier.ValueText;
+
+        if (identifier.EndsWith("Attribute", StringComparison.Ordinal))
+            identifier = identifier.Substring(0, identifier.Length - "Attribute".Length);
+
+        if (!string.Equals(identifier, "EnumValue", StringComparison.Ordinal))
+            return false;
+
+        if (simpleName is GenericNameSyntax genericName && genericName.TypeArgumentList.Arguments.Count == 1)
+            genericArgTypeSyntax = genericName.TypeArgumentList.Arguments[0];
+
+        return true;
+    }
+
+    private static bool IsIncludeEnumValuesAttributeSyntax(AttributeSyntax attribute)
+    {
+        SimpleNameSyntax? simpleName = attribute.Name switch
+        {
+            SimpleNameSyntax simple => simple,
+            QualifiedNameSyntax qualified => qualified.Right,
+            AliasQualifiedNameSyntax aliasQualified => aliasQualified.Name,
+            _ => null
+        };
+
+        if (simpleName is null)
+            return false;
+
+        string identifier = simpleName.Identifier.ValueText;
+        if (identifier.EndsWith("Attribute", StringComparison.Ordinal))
+            identifier = identifier.Substring(0, identifier.Length - "Attribute".Length);
+
+        return string.Equals(identifier, "IncludeEnumValues", StringComparison.Ordinal);
+    }
+
+    private static void EmitAttributeSources(SourceProductionContext context, Compilation compilation)
+    {
+        bool hasEnumValue = compilation.GetTypeByMetadataName("Soenneker.Gen.EnumValues.EnumValueAttribute") is not null;
+        bool hasGenericEnumValue = compilation.GetTypeByMetadataName("Soenneker.Gen.EnumValues.EnumValueAttribute`1") is not null;
+        bool hasIncludeEnumValues = compilation.GetTypeByMetadataName("Soenneker.Gen.EnumValues.IncludeEnumValuesAttribute") is not null;
+
+        if (hasEnumValue && hasGenericEnumValue && hasIncludeEnumValues)
+            return;
+
+        string source = BuildAttributeSource(hasEnumValue, hasGenericEnumValue, hasIncludeEnumValues);
+        context.AddSource("EnumValueAttributes.g.cs", SourceText.From(source, Encoding.UTF8));
+    }
+
+    private static string BuildAttributeSource(bool hasEnumValue, bool hasGenericEnumValue, bool hasIncludeEnumValues)
+    {
+        var source = new StringBuilder();
+        source.AppendLine("// <auto-generated/>");
+        source.AppendLine("#nullable enable");
+        source.AppendLine();
+        source.AppendLine("namespace Soenneker.Gen.EnumValues;");
+        source.AppendLine();
+
+        if (!hasEnumValue)
+        {
+            source.AppendLine("/// <summary>");
+            source.AppendLine("/// Marks a class or struct for source generation of enum value helpers (names, values, try-from methods).");
+            source.AppendLine("/// </summary>");
+            source.AppendLine("[global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]");
+            source.AppendLine("public sealed class EnumValueAttribute : global::System.Attribute");
+            source.AppendLine("{");
+            source.AppendLine("}");
+            source.AppendLine();
+        }
+
+        if (!hasGenericEnumValue)
+        {
+            source.AppendLine("/// <summary>");
+            source.AppendLine("/// Marks a class or struct for source generation of enum value helpers with a specific value type <typeparamref name=\"TValue\"/>.");
+            source.AppendLine("/// </summary>");
+            source.AppendLine("/// <typeparam name=\"TValue\">The type of the enum's underlying value (e.g. int, long, string).</typeparam>");
+            source.AppendLine("[global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]");
+            source.AppendLine("public sealed class EnumValueAttribute<TValue> : global::System.Attribute");
+            source.AppendLine("{");
+            source.AppendLine("}");
+            source.AppendLine();
+        }
+
+        if (!hasIncludeEnumValues)
+        {
+            source.AppendLine("/// <summary>");
+            source.AppendLine("/// Includes enum members from another type in the generated values for the attributed type.");
+            source.AppendLine("/// </summary>");
+            source.AppendLine("[global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]");
+            source.AppendLine("public sealed class IncludeEnumValuesAttribute : global::System.Attribute");
+            source.AppendLine("{");
+            source.AppendLine("    /// <summary>");
+            source.AppendLine("    /// The type whose enum values are included (e.g. another enum or enum-value type).");
+            source.AppendLine("    /// </summary>");
+            source.AppendLine("    public global::System.Type SourceType { get; }");
+            source.AppendLine();
+            source.AppendLine("    /// <summary>");
+            source.AppendLine("    /// Includes enum values from the specified type.");
+            source.AppendLine("    /// </summary>");
+            source.AppendLine("    /// <param name=\"sourceType\">The type to include values from.</param>");
+            source.AppendLine("    public IncludeEnumValuesAttribute(global::System.Type sourceType) => SourceType = sourceType;");
+            source.AppendLine("}");
+        }
+
+        return source.ToString();
+    }
+
+    private static ImmutableArray<INamedTypeSymbol> GetIncludeEnumValuesSourceTypes(INamedTypeSymbol enumType, Compilation compilation)
     {
         var list = new List<INamedTypeSymbol>();
-        foreach (AttributeData attribute in enumType.GetAttributes())
+        foreach (SyntaxReference syntaxReference in enumType.DeclaringSyntaxReferences)
         {
-            if (attribute.AttributeClass?.Name != "IncludeEnumValuesAttribute")
+            if (syntaxReference.GetSyntax() is not TypeDeclarationSyntax typeDeclaration)
                 continue;
-            if (attribute.ConstructorArguments.Length == 0)
-                continue;
-            TypedConstant arg = attribute.ConstructorArguments[0];
-            if (arg.Kind != TypedConstantKind.Type || arg.Value is not INamedTypeSymbol sourceType)
-                continue;
-            list.Add(sourceType);
+
+            SemanticModel semanticModel = compilation.GetSemanticModel(typeDeclaration.SyntaxTree);
+            SyntaxList<AttributeListSyntax> attributeLists = typeDeclaration.AttributeLists;
+
+            for (var i = 0; i < attributeLists.Count; i++)
+            {
+                SeparatedSyntaxList<AttributeSyntax> attributes = attributeLists[i].Attributes;
+                for (var j = 0; j < attributes.Count; j++)
+                {
+                    AttributeSyntax attribute = attributes[j];
+
+                    if (!IsIncludeEnumValuesAttributeSyntax(attribute))
+                        continue;
+
+                    if (attribute.ArgumentList is null || attribute.ArgumentList.Arguments.Count == 0)
+                        continue;
+
+                    ExpressionSyntax expression = attribute.ArgumentList.Arguments[0].Expression;
+                    if (expression is not TypeOfExpressionSyntax typeOfExpression)
+                        continue;
+
+                    ITypeSymbol? resolvedType = semanticModel.GetTypeInfo(typeOfExpression.Type).Type;
+                    if (resolvedType is INamedTypeSymbol sourceType)
+                        list.Add(sourceType);
+                }
+            }
         }
         return list.ToImmutableArray();
     }
@@ -209,6 +349,39 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
                 return true;
             }
         }
+
+        foreach (SyntaxReference syntaxReference in type.DeclaringSyntaxReferences)
+        {
+            if (syntaxReference.GetSyntax() is not TypeDeclarationSyntax typeDeclaration)
+                continue;
+
+            SemanticModel semanticModel = compilation.GetSemanticModel(typeDeclaration.SyntaxTree);
+            SyntaxList<AttributeListSyntax> attributeLists = typeDeclaration.AttributeLists;
+            for (var i = 0; i < attributeLists.Count; i++)
+            {
+                SeparatedSyntaxList<AttributeSyntax> attributes = attributeLists[i].Attributes;
+                for (var j = 0; j < attributes.Count; j++)
+                {
+                    AttributeSyntax attribute = attributes[j];
+                    if (!TryGetEnumValueAttributeTypeSyntax(attribute, out TypeSyntax? genericArgTypeSyntax))
+                        continue;
+
+                    if (genericArgTypeSyntax is null)
+                    {
+                        valueType = compilation.GetTypeByMetadataName("System.Int32") as INamedTypeSymbol;
+                        return valueType is not null;
+                    }
+
+                    ITypeSymbol? resolvedType = semanticModel.GetTypeInfo(genericArgTypeSyntax).Type;
+                    if (resolvedType is INamedTypeSymbol genericValueType)
+                    {
+                        valueType = genericValueType;
+                        return true;
+                    }
+                }
+            }
+        }
+
         return false;
     }
 
@@ -243,7 +416,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         List<EnumInstance> ownInstances = GatherInstances(context, compilation, enumType, valueType);
 
         List<EnumInstance> instances = new List<EnumInstance>(ownInstances);
-        ImmutableArray<INamedTypeSymbol> includeTypes = GetIncludeEnumValuesSourceTypes(enumType);
+        ImmutableArray<INamedTypeSymbol> includeTypes = GetIncludeEnumValuesSourceTypes(enumType, compilation);
         foreach (INamedTypeSymbol sourceType in includeTypes)
         {
             if (!TryGetEnumValueValueType(sourceType, compilation, out INamedTypeSymbol? sourceValueType) ||
@@ -699,45 +872,4 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         }
     }
 
-    private const string _attributeSource = """
-                                           // <auto-generated/>
-                                           #nullable enable
-
-                                           namespace Soenneker.Gen.EnumValues;
-
-                                           /// <summary>
-                                           /// Marks a class or struct for source generation of enum value helpers (names, values, try-from methods).
-                                           /// </summary>
-                                           [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
-                                           public sealed class EnumValueAttribute : global::System.Attribute
-                                           {
-                                           }
-
-                                           /// <summary>
-                                           /// Marks a class or struct for source generation of enum value helpers with a specific value type <typeparamref name="TValue"/>.
-                                           /// </summary>
-                                           /// <typeparam name="TValue">The type of the enum's underlying value (e.g. int, long, string).</typeparam>
-                                           [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
-                                           public sealed class EnumValueAttribute<TValue> : global::System.Attribute
-                                           {
-                                           }
-
-                                           /// <summary>
-                                           /// Includes enum members from another type in the generated values for the attributed type.
-                                           /// </summary>
-                                           [global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]
-                                           public sealed class IncludeEnumValuesAttribute : global::System.Attribute
-                                           {
-                                               /// <summary>
-                                               /// The type whose enum values are included (e.g. another enum or enum-value type).
-                                               /// </summary>
-                                               public global::System.Type SourceType { get; }
-
-                                               /// <summary>
-                                               /// Includes enum values from the specified type.
-                                               /// </summary>
-                                               /// <param name="sourceType">The type to include values from.</param>
-                                               public IncludeEnumValuesAttribute(global::System.Type sourceType) => SourceType = sourceType;
-                                           }
-                                           """;
 }
