@@ -223,9 +223,9 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 
     private static void EmitAttributeSources(SourceProductionContext context, Compilation compilation)
     {
-        bool hasEnumValue = HasTypeByMetadataName(compilation, "Soenneker.Gen.EnumValues.EnumValueAttribute");
-        bool hasGenericEnumValue = HasTypeByMetadataName(compilation, "Soenneker.Gen.EnumValues.EnumValueAttribute`1");
-        bool hasIncludeEnumValues = HasTypeByMetadataName(compilation, "Soenneker.Gen.EnumValues.IncludeEnumValuesAttribute");
+        bool hasEnumValue = HasTypeInCurrentAssembly(compilation, "Soenneker.Gen.EnumValues.EnumValueAttribute");
+        bool hasGenericEnumValue = HasTypeInCurrentAssembly(compilation, "Soenneker.Gen.EnumValues.EnumValueAttribute`1");
+        bool hasIncludeEnumValues = HasTypeInCurrentAssembly(compilation, "Soenneker.Gen.EnumValues.IncludeEnumValuesAttribute");
 
         if (hasEnumValue && hasGenericEnumValue && hasIncludeEnumValues)
             return;
@@ -234,21 +234,9 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         context.AddSource("EnumValueAttributes.g.cs", SourceText.From(source, Encoding.UTF8));
     }
 
-    private static bool HasTypeByMetadataName(Compilation compilation, string metadataName)
+    private static bool HasTypeInCurrentAssembly(Compilation compilation, string metadataName)
     {
-        if (compilation.Assembly.GetTypeByMetadataName(metadataName) is not null)
-            return true;
-
-        foreach (MetadataReference reference in compilation.References)
-        {
-            if (compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol assemblySymbol)
-                continue;
-
-            if (assemblySymbol.GetTypeByMetadataName(metadataName) is not null)
-                return true;
-        }
-
-        return false;
+        return compilation.Assembly.GetTypeByMetadataName(metadataName) is not null;
     }
 
     private static string BuildAttributeSource(bool hasEnumValue, bool hasGenericEnumValue, bool hasIncludeEnumValues)
@@ -266,7 +254,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine("/// Marks a class or struct for source generation of enum value helpers (names, values, try-from methods).");
             source.AppendLine("/// </summary>");
             source.AppendLine("[global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]");
-            source.AppendLine("public sealed class EnumValueAttribute : global::System.Attribute");
+            source.AppendLine("internal sealed class EnumValueAttribute : global::System.Attribute");
             source.AppendLine("{");
             source.AppendLine("}");
             source.AppendLine();
@@ -279,7 +267,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine("/// </summary>");
             source.AppendLine("/// <typeparam name=\"TValue\">The type of the enum's underlying value (e.g. int, long, string).</typeparam>");
             source.AppendLine("[global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]");
-            source.AppendLine("public sealed class EnumValueAttribute<TValue> : global::System.Attribute");
+            source.AppendLine("internal sealed class EnumValueAttribute<TValue> : global::System.Attribute");
             source.AppendLine("{");
             source.AppendLine("}");
             source.AppendLine();
@@ -291,7 +279,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
             source.AppendLine("/// Includes enum members from another type in the generated values for the attributed type.");
             source.AppendLine("/// </summary>");
             source.AppendLine("[global::System.AttributeUsage(global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct, AllowMultiple = true, Inherited = false)]");
-            source.AppendLine("public sealed class IncludeEnumValuesAttribute : global::System.Attribute");
+            source.AppendLine("internal sealed class IncludeEnumValuesAttribute : global::System.Attribute");
             source.AppendLine("{");
             source.AppendLine("    /// <summary>");
             source.AppendLine("    /// The type whose enum values are included (e.g. another enum or enum-value type).");
