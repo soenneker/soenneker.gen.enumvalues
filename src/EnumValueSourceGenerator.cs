@@ -223,15 +223,32 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 
     private static void EmitAttributeSources(SourceProductionContext context, Compilation compilation)
     {
-        bool hasEnumValue = compilation.GetTypeByMetadataName("Soenneker.Gen.EnumValues.EnumValueAttribute") is not null;
-        bool hasGenericEnumValue = compilation.GetTypeByMetadataName("Soenneker.Gen.EnumValues.EnumValueAttribute`1") is not null;
-        bool hasIncludeEnumValues = compilation.GetTypeByMetadataName("Soenneker.Gen.EnumValues.IncludeEnumValuesAttribute") is not null;
+        bool hasEnumValue = HasTypeByMetadataName(compilation, "Soenneker.Gen.EnumValues.EnumValueAttribute");
+        bool hasGenericEnumValue = HasTypeByMetadataName(compilation, "Soenneker.Gen.EnumValues.EnumValueAttribute`1");
+        bool hasIncludeEnumValues = HasTypeByMetadataName(compilation, "Soenneker.Gen.EnumValues.IncludeEnumValuesAttribute");
 
         if (hasEnumValue && hasGenericEnumValue && hasIncludeEnumValues)
             return;
 
         string source = BuildAttributeSource(hasEnumValue, hasGenericEnumValue, hasIncludeEnumValues);
         context.AddSource("EnumValueAttributes.g.cs", SourceText.From(source, Encoding.UTF8));
+    }
+
+    private static bool HasTypeByMetadataName(Compilation compilation, string metadataName)
+    {
+        if (compilation.Assembly.GetTypeByMetadataName(metadataName) is not null)
+            return true;
+
+        foreach (MetadataReference reference in compilation.References)
+        {
+            if (compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol assemblySymbol)
+                continue;
+
+            if (assemblySymbol.GetTypeByMetadataName(metadataName) is not null)
+                return true;
+        }
+
+        return false;
     }
 
     private static string BuildAttributeSource(bool hasEnumValue, bool hasGenericEnumValue, bool hasIncludeEnumValues)
