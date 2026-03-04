@@ -29,29 +29,11 @@ internal readonly struct EnumSourceBuildContext
     public readonly string StjReadRawValueCode;
     public readonly string StjWriteValueCode;
 
-    public EnumSourceBuildContext(
-        INamedTypeSymbol enumType,
-        INamedTypeSymbol valueType,
-        List<EnumInstance> instances,
-        bool hasValueProperty,
-        bool hasValueIdConstructor,
-        bool hasNameProperty,
-        bool supportsNewtonsoft,
-        string enumTypeName,
-        string valueTypeName,
-        string ns,
-        string kind,
-        string stjConverterTypeName,
-        string newtonsoftConverterTypeName,
-        string typeConverterName,
-        bool isStringValue,
-        bool useIdBacking,
-        string valueTryFromSignature,
-        List<(string ConstantName, string TargetName)> valueItems,
-        List<(string ConstantName, string TargetName)> nameItems,
-        List<(string Text, string TargetName)> nameSpanItems,
-        List<(string Text, string TargetName)> valueSpanItems,
-        string stjReadRawValueCode,
+    public EnumSourceBuildContext(INamedTypeSymbol enumType, INamedTypeSymbol valueType, List<EnumInstance> instances, bool hasValueProperty,
+        bool hasValueIdConstructor, bool hasNameProperty, bool supportsNewtonsoft, string enumTypeName, string valueTypeName, string ns, string kind,
+        string stjConverterTypeName, string newtonsoftConverterTypeName, string typeConverterName, bool isStringValue, bool useIdBacking,
+        string valueTryFromSignature, List<(string ConstantName, string TargetName)> valueItems, List<(string ConstantName, string TargetName)> nameItems,
+        List<(string Text, string TargetName)> nameSpanItems, List<(string Text, string TargetName)> valueSpanItems, string stjReadRawValueCode,
         string stjWriteValueCode)
     {
         EnumType = enumType;
