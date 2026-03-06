@@ -276,7 +276,7 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine("        if (TryFromValue(value, out var result))");
         source.AppendLine("            return result;");
         source.AppendLine();
-        source.AppendLine("        return ThrowHelper.UnknownValue(value);");
+        source.Append("        return ").Append(GetThrowHelperTypeName(ctx)).AppendLine(".UnknownValue(value);");
         source.AppendLine("    }");
         source.AppendLine();
 
@@ -305,7 +305,7 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine("        if (TryFromName(name, out var result))");
         source.AppendLine("            return result;");
         source.AppendLine();
-        source.AppendLine("        return ThrowHelper.UnknownName(name);");
+        source.Append("        return ").Append(GetThrowHelperTypeName(ctx)).AppendLine(".UnknownName(name);");
         source.AppendLine("    }");
         source.AppendLine();
         AppendIsDefinedIsNameDefined(source, ctx.EnumTypeName, ctx.ValueTypeName, ctx.IsStringValue);
@@ -537,12 +537,14 @@ public sealed partial class EnumValueSourceGenerator
 
     private static void AppendThrowHelperAndConverters(StringBuilder source, in EnumSourceBuildContext ctx)
     {
+        string throwHelperTypeName = GetThrowHelperTypeName(ctx);
+
         source.AppendLine("}");
         source.AppendLine();
         source.AppendLine("/// <summary>");
         source.AppendLine("/// Throws for unknown values or names.");
         source.AppendLine("/// </summary>");
-        source.AppendLine("file static class ThrowHelper");
+        source.Append("file static class ").Append(throwHelperTypeName).AppendLine();
         source.AppendLine("{");
         source.AppendLine("    /// <summary>Throws <see cref=\"global::System.ArgumentOutOfRangeException\"/> for an unknown value.</summary>");
         source.AppendLine("    [global::System.Diagnostics.CodeAnalysis.DoesNotReturn]");
@@ -562,6 +564,11 @@ public sealed partial class EnumValueSourceGenerator
         AppendStjConverter(source, ctx);
         if (ctx.SupportsNewtonsoft)
             AppendNewtonsoftConverter(source, ctx);
+    }
+
+    private static string GetThrowHelperTypeName(in EnumSourceBuildContext ctx)
+    {
+        return "__" + ctx.EnumType.Name + "ThrowHelper";
     }
 
     private static void AppendStjConverter(StringBuilder source, in EnumSourceBuildContext ctx)
