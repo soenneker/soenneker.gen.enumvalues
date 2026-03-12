@@ -13,31 +13,31 @@ public sealed partial class EnumValueSourceGenerator
         switch (valueType.SpecialType)
         {
             case SpecialType.System_Int32:
-                return "        if (!reader.TryGetInt32(out int rawValue)) throw new global::System.Text.Json.JsonException(\"Expected int value.\");";
+                return "        if (!reader.TryGetInt32(out int rawValue)) throw new global::System.Text.Json.JsonException(\"Expected int value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_Int64:
-                return "        if (!reader.TryGetInt64(out long rawValue)) throw new global::System.Text.Json.JsonException(\"Expected long value.\");";
+                return "        if (!reader.TryGetInt64(out long rawValue)) throw new global::System.Text.Json.JsonException(\"Expected long value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_Int16:
-                return "        if (!reader.TryGetInt16(out short rawValue)) throw new global::System.Text.Json.JsonException(\"Expected short value.\");";
+                return "        if (!reader.TryGetInt16(out short rawValue)) throw new global::System.Text.Json.JsonException(\"Expected short value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_Byte:
-                return "        if (!reader.TryGetByte(out byte rawValue)) throw new global::System.Text.Json.JsonException(\"Expected byte value.\");";
+                return "        if (!reader.TryGetByte(out byte rawValue)) throw new global::System.Text.Json.JsonException(\"Expected byte value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_SByte:
-                return "        if (!reader.TryGetSByte(out sbyte rawValue)) throw new global::System.Text.Json.JsonException(\"Expected sbyte value.\");";
+                return "        if (!reader.TryGetSByte(out sbyte rawValue)) throw new global::System.Text.Json.JsonException(\"Expected sbyte value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_UInt16:
-                return "        if (!reader.TryGetUInt16(out ushort rawValue)) throw new global::System.Text.Json.JsonException(\"Expected ushort value.\");";
+                return "        if (!reader.TryGetUInt16(out ushort rawValue)) throw new global::System.Text.Json.JsonException(\"Expected ushort value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_UInt32:
-                return "        if (!reader.TryGetUInt32(out uint rawValue)) throw new global::System.Text.Json.JsonException(\"Expected uint value.\");";
+                return "        if (!reader.TryGetUInt32(out uint rawValue)) throw new global::System.Text.Json.JsonException(\"Expected uint value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_UInt64:
-                return "        if (!reader.TryGetUInt64(out ulong rawValue)) throw new global::System.Text.Json.JsonException(\"Expected ulong value.\");";
+                return "        if (!reader.TryGetUInt64(out ulong rawValue)) throw new global::System.Text.Json.JsonException(\"Expected ulong value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_String:
-                return "        string? rawValue = reader.GetString(); if (rawValue is null) throw new global::System.Text.Json.JsonException(\"Expected string value.\");";
+                return "        string? rawValue = reader.GetString(); if (rawValue is null) throw new global::System.Text.Json.JsonException(\"Expected non-null string value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_Char:
-                return "        string? charText = reader.GetString(); if (string.IsNullOrEmpty(charText) || charText.Length != 1) throw new global::System.Text.Json.JsonException(\"Expected char value.\"); char rawValue = charText[0];";
+                return "        string? charText = reader.GetString(); if (string.IsNullOrEmpty(charText) || charText.Length != 1) throw new global::System.Text.Json.JsonException(\"Expected single-character string. Got: \" + (charText ?? \"(null)\") + \".\"); char rawValue = charText![0];";
             case SpecialType.System_Boolean:
-                return "        if (reader.TokenType != global::System.Text.Json.JsonTokenType.True && reader.TokenType != global::System.Text.Json.JsonTokenType.False) throw new global::System.Text.Json.JsonException(\"Expected bool value.\"); bool rawValue = reader.GetBoolean();";
+                return "        if (reader.TokenType != global::System.Text.Json.JsonTokenType.True && reader.TokenType != global::System.Text.Json.JsonTokenType.False) throw new global::System.Text.Json.JsonException(\"Expected bool value. Token type: \" + reader.TokenType + \".\"); bool rawValue = reader.GetBoolean();";
             default:
             {
                 if (valueType.ToDisplayString() == "System.Guid")
-                    return "        if (reader.TokenType != global::System.Text.Json.JsonTokenType.String) throw new global::System.Text.Json.JsonException(\"Expected Guid string value.\"); global::System.Guid rawValue = reader.GetGuid();";
+                    return "        if (reader.TokenType != global::System.Text.Json.JsonTokenType.String) throw new global::System.Text.Json.JsonException(\"Expected Guid string value. Token type: \" + reader.TokenType + \".\"); global::System.Guid rawValue = reader.GetGuid();";
 
                 return "        " + typeName + " rawValue = global::System.Text.Json.JsonSerializer.Deserialize<" + typeName +
                        ">(ref reader, options)!;";
@@ -70,7 +70,7 @@ public sealed partial class EnumValueSourceGenerator
         }
         source.AppendLine("            return result;");
         source.AppendLine();
-        source.AppendLine("        throw new global::System.ArgumentException(\"Unknown enum value.\", nameof(value));");
+        source.AppendLine("        throw new global::System.ArgumentException($\"Unknown enum value: '{s}'.\", nameof(value));");
         source.AppendLine("    }");
         source.AppendLine();
         source.AppendLine("    public override bool CanConvertTo(global::System.ComponentModel.ITypeDescriptorContext? context, global::System.Type? destinationType)");
@@ -117,25 +117,6 @@ public sealed partial class EnumValueSourceGenerator
         }
     }
 
-    private static void AppendStringSwitchBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel)
-    {
-        string indent = new(' ', indentLevel * 4);
-        string innerIndent = new(' ', (indentLevel + 1) * 4);
-
-        source.Append(indent).Append("switch (").Append(inputIdentifier).AppendLine(")");
-        source.Append(indent).AppendLine("{");
-
-        foreach ((string text, string targetName) in items)
-        {
-            source.Append(innerIndent).Append("case \"").Append(EscapeString(text)).Append("\": result = ").Append(targetName).AppendLine("; return true;");
-        }
-
-        source.Append(innerIndent).AppendLine("default:");
-        source.Append(innerIndent).AppendLine("    result = default!;");
-        source.Append(innerIndent).AppendLine("    return false;");
-        source.Append(indent).AppendLine("}");
-    }
-
     private static void AppendStringConstantSwitchBody(StringBuilder source, List<(string ConstantName, string TargetName)> items, string paramName, int indentLevel)
     {
         string indent = new(' ', indentLevel * 4);
@@ -147,25 +128,6 @@ public sealed partial class EnumValueSourceGenerator
         {
             source.Append(innerIndent).Append("case ").Append(constantName).Append(": result = ").Append(targetName).AppendLine("; return true;");
         }
-        source.Append(innerIndent).AppendLine("default:");
-        source.Append(innerIndent).AppendLine("    result = default!;");
-        source.Append(innerIndent).AppendLine("    return false;");
-        source.Append(indent).AppendLine("}");
-    }
-
-    private static void AppendSpanSwitchBody(StringBuilder source, List<(string Text, string TargetName)> items, string inputIdentifier, int indentLevel)
-    {
-        string indent = new(' ', indentLevel * 4);
-        string innerIndent = new(' ', (indentLevel + 1) * 4);
-
-        source.Append(indent).Append("switch (").Append(inputIdentifier).AppendLine(")");
-        source.Append(indent).AppendLine("{");
-
-        foreach ((string text, string targetName) in items)
-        {
-            source.Append(innerIndent).Append("case \"").Append(EscapeString(text)).Append("\": result = ").Append(targetName).AppendLine("; return true;");
-        }
-
         source.Append(innerIndent).AppendLine("default:");
         source.Append(innerIndent).AppendLine("    result = default!;");
         source.Append(innerIndent).AppendLine("    return false;");

@@ -153,7 +153,7 @@ public sealed partial class EnumValueSourceGenerator
                 : ctx.Instances[i].ValueLiteral;
             source.Append("        ").Append(caseExpr).Append(" => ").Append(instanceId).AppendLine(",");
         }
-        source.AppendLine("        _ => throw new global::System.ArgumentOutOfRangeException(nameof(value), value, \"Unknown enum value.\")");
+        source.AppendLine("        _ => throw new global::System.ArgumentOutOfRangeException(nameof(value), value, \"Unknown enum value: \" + value + \".\")");
         source.AppendLine("    };");
         source.AppendLine();
     }
@@ -550,13 +550,13 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine("    [global::System.Diagnostics.CodeAnalysis.DoesNotReturn]");
         source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]");
         source.Append("    public static ").Append(ctx.EnumTypeName).Append(" UnknownValue(").Append(ctx.ValueTypeName).AppendLine(" value)");
-        source.AppendLine("        => throw new global::System.ArgumentOutOfRangeException(nameof(value), value, \"Unknown enum value.\");");
+        source.AppendLine("        => throw new global::System.ArgumentOutOfRangeException(nameof(value), value, \"Unknown enum value: \" + value + \".\");");
         source.AppendLine();
         source.AppendLine("    /// <summary>Throws <see cref=\"global::System.ArgumentOutOfRangeException\"/> for an unknown name.</summary>");
         source.AppendLine("    [global::System.Diagnostics.CodeAnalysis.DoesNotReturn]");
         source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]");
         source.Append("    public static ").Append(ctx.EnumTypeName).AppendLine(" UnknownName(string name)");
-        source.AppendLine("        => throw new global::System.ArgumentOutOfRangeException(nameof(name), name, \"Unknown enum name.\");");
+        source.AppendLine("        => throw new global::System.ArgumentOutOfRangeException(nameof(name), name, \"Unknown enum name: '\" + name + \"'.\");");
         source.AppendLine("}");
         source.AppendLine();
         AppendTypeConverterClass(source, ctx.EnumType, ctx.ValueType, ctx.EnumTypeName, ctx.ValueTypeName, ctx.TypeConverterName, ctx.IsStringValue);
@@ -584,7 +584,7 @@ public sealed partial class EnumValueSourceGenerator
         if (ctx.IsStringValue)
         {
             source.AppendLine("        if (reader.TokenType != global::System.Text.Json.JsonTokenType.String)");
-            source.AppendLine("            throw new global::System.Text.Json.JsonException(\"Expected string value.\");");
+            source.AppendLine("            throw new global::System.Text.Json.JsonException(\"Expected string value. Token type: \" + reader.TokenType + \".\");");
             source.AppendLine();
 
             for (var i = 0; i < ctx.Instances.Count; i++)
@@ -592,6 +592,8 @@ public sealed partial class EnumValueSourceGenerator
                 source.Append("        if (reader.ValueTextEquals(").Append(ctx.Instances[i].ValueLiteral).Append("u8)) return ")
                     .Append(ctx.EnumTypeName).Append(".").Append(ctx.Instances[i].Name).AppendLine(";");
             }
+            source.AppendLine("        string? rawStr = reader.GetString();");
+            source.Append("        throw new global::System.Text.Json.JsonException($\"Cannot deserialize '").Append(ctx.EnumTypeName).AppendLine("': unknown value '\" + (rawStr ?? \"(null)\") + \"'.\");");
         }
         else
         {
@@ -599,9 +601,9 @@ public sealed partial class EnumValueSourceGenerator
             source.AppendLine();
             source.Append("        if (").Append(ctx.EnumTypeName).AppendLine(".TryFromValue(rawValue, out var result))");
             source.AppendLine("            return result;");
+            source.Append("        throw new global::System.Text.Json.JsonException($\"Cannot deserialize '").Append(ctx.EnumTypeName).AppendLine("': unknown value '\" + rawValue + \"'.\");");
         }
         source.AppendLine();
-        source.AppendLine("        throw new global::System.Text.Json.JsonException(\"Unknown enum value.\");");
         source.AppendLine("    }");
         source.AppendLine();
         source.Append("    public override void Write(global::System.Text.Json.Utf8JsonWriter writer, ").Append(ctx.EnumTypeName)
@@ -630,7 +632,8 @@ public sealed partial class EnumValueSourceGenerator
                     .Append(ctx.EnumTypeName).Append(".").Append(ctx.Instances[i].Name).AppendLine(";");
             }
         }
-        source.AppendLine("        throw new global::System.Text.Json.JsonException(\"Unknown enum value.\");");
+        source.AppendLine("        string? rawPropName = reader.GetString();");
+        source.Append("        throw new global::System.Text.Json.JsonException($\"Cannot deserialize '").Append(ctx.EnumTypeName).AppendLine("': unknown property name '\" + (rawPropName ?? \"(null)\") + \"'.\");");
         source.AppendLine("    }");
         source.AppendLine();
         source.Append("    public override void WriteAsPropertyName(global::System.Text.Json.Utf8JsonWriter writer, ").Append(ctx.EnumTypeName).AppendLine(" value, global::System.Text.Json.JsonSerializerOptions options)");
@@ -700,7 +703,7 @@ public sealed partial class EnumValueSourceGenerator
         source.Append("        if (").Append(ctx.EnumTypeName).AppendLine(".TryFromValue(rawValue, out var result))");
         source.AppendLine("            return result;");
         source.AppendLine();
-        source.AppendLine("        throw new global::Newtonsoft.Json.JsonSerializationException(\"Unknown enum value.\");");
+        source.Append("        throw new global::Newtonsoft.Json.JsonSerializationException($\"Cannot deserialize '").Append(ctx.EnumTypeName).AppendLine("': unknown value '\" + rawValue + \"'.\");");
         source.AppendLine("    }");
         source.AppendLine();
         source.Append("    public override void WriteJson(global::Newtonsoft.Json.JsonWriter writer, ").Append(writeValueType)

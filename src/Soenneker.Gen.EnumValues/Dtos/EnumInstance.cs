@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-namespace Soenneker.Gen.EnumValues;
+namespace Soenneker.Gen.EnumValues.Dtos;
 
 internal sealed class EnumInstance
 {

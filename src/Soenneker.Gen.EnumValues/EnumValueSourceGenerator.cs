@@ -779,15 +779,15 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
             case SpecialType.System_UInt64:
                 return "        ulong rawValue = global::System.Convert.ToUInt64(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
             case SpecialType.System_String:
-                return "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected string value.\"); string rawValue = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected string value.\");";
+                return "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected string value. Token type: \" + reader.TokenType + \".\"); string rawValue = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected non-null string value. Token type: \" + reader.TokenType + \".\");";
             case SpecialType.System_Char:
-                return "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected char value.\"); string charText = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected char value.\"); if (charText.Length != 1) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected single-character value.\"); char rawValue = charText[0];";
+                return "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected char value. Token type: \" + reader.TokenType + \".\"); string charText = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected char value.\"); if (charText == null || charText.Length != 1) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected single-character value. Got: \" + (charText ?? \"(null)\") + \".\"); char rawValue = charText[0];";
             case SpecialType.System_Boolean:
                 return "        bool rawValue = global::System.Convert.ToBoolean(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
             default:
             {
                 if (valueType.ToDisplayString() == "System.Guid")
-                    return "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected Guid string value.\"); string guidText = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected Guid string value.\"); global::System.Guid rawValue = global::System.Guid.Parse(guidText);";
+                    return "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected Guid string value. Token type: \" + reader.TokenType + \".\"); string guidText = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected Guid string value.\"); global::System.Guid rawValue = global::System.Guid.Parse(guidText);";
 
                 return "        " + typeName + " rawValue = serializer.Deserialize<" + typeName + ">(reader)!;";
             }
@@ -848,12 +848,12 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
             return "            default:\n" +
                    "                global::System.Span<byte> buf = stackalloc byte[" + bufferSize + "];\n" +
                    "                if (!global::System.Buffers.Text.Utf8Formatter.TryFormat(value.Value, buf, out int written))\n" +
-                   "                    throw new global::System.Text.Json.JsonException(\"Unknown enum value.\");\n" +
+                   "                    throw new global::System.Text.Json.JsonException($\"Unknown enum value for property name: '\" + value.Value + \"'.\");\n" +
                    "                writer.WritePropertyName(buf[..written]);\n" +
                    "                return;";
         }
         return "            default:\n" +
-               "                throw new global::System.Text.Json.JsonException(\"Unknown enum value.\");";
+               "                throw new global::System.Text.Json.JsonException($\"Unknown enum value for property name: '\" + value.Value + \"'.\");";
     }
 
     private static bool CanEmitConstant(ITypeSymbol valueType)
