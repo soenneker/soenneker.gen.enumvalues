@@ -26,7 +26,7 @@ public class TryFromValueBenchmark
         return (r, b);
     }
 
-//    [Benchmark]
+    [Benchmark]
     public (ColorCodeSmartEnum?, ColorCodeSmartEnum?) SmartEnum()
     {
         ColorCodeSmartEnum.TryFromValue(_r, out ColorCodeSmartEnum? r);
@@ -46,7 +46,7 @@ public class TryFromValueBenchmark
         return ColorCodeIntellenum.TryFromValue(_miss, out _);
     }
 
-  //  [Benchmark]
+    [Benchmark]
     public bool SmartEnum_Miss()
     {
         return ColorCodeSmartEnum.TryFromValue(_miss, out _);

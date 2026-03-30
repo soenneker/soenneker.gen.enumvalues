@@ -26,7 +26,7 @@ public class TryFromNameBenchmark
         return (r, b);
     }
 
-    //[Benchmark]
+    [Benchmark]
     public (ColorCodeSmartEnum?, ColorCodeSmartEnum?) SmartEnum()
     {
         ColorCodeSmartEnum.TryFromName(_red, out ColorCodeSmartEnum? r);
@@ -34,19 +34,19 @@ public class TryFromNameBenchmark
         return (r, b);
     }
 
-  //  [Benchmark]
+    [Benchmark]
     public bool GenEnumValues_Miss()
     {
         return ColorCode.TryFromName(_miss, out _);
     }
 
-  //  [Benchmark]
+    [Benchmark]
     public bool Intellenum_Miss()
     {
         return ColorCodeIntellenum.TryFromName(_miss, out _);
     }
 
-   // [Benchmark]
+    [Benchmark]
     public bool SmartEnum_Miss()
     {
         return ColorCodeSmartEnum.TryFromName(_miss, out _);

@@ -8,26 +8,26 @@ namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
 public class EnumValuesListBenchmark
 {
     [Benchmark(Baseline = true)]
-    public System.Collections.Generic.IReadOnlyList<ColorCode> GenEnumValues_Small()
+    public int GenEnumValues_Small()
     {
-        return ColorCode.List;
-    }
-
-   // [Benchmark]
-    public System.Collections.Generic.IReadOnlyList<ColorCodeSmartEnum> SmartEnum_Small()
-    {
-        return ColorCodeSmartEnum.List.ToList();
+        return ColorCode.List.Count;
     }
 
     [Benchmark]
-    public System.Collections.Generic.IEnumerable<ColorCodeIntellenum> Intellenum_Small()
+    public int SmartEnum_Small()
     {
-        return ColorCodeIntellenum.List();
+        return ColorCodeSmartEnum.List.Count;
+    }
+
+    [Benchmark]
+    public int Intellenum_Small()
+    {
+        return ColorCodeIntellenum.List().Count();
     }
 
     //[Benchmark]
-    public System.Collections.Generic.IReadOnlyList<ColorCodeLarge> GenEnumValues_Large()
-    {
-        return ColorCodeLarge.List;
-    }
+    //public int GenEnumValues_Large()
+    //{
+    //    return ColorCodeLarge.List.Count;
+    //}
 }
