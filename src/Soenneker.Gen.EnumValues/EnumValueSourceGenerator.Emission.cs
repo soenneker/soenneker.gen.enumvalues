@@ -311,19 +311,25 @@ public sealed partial class EnumValueSourceGenerator
               .AppendLine("> __list = __values;");
         source.AppendLine();
         AppendXmlSummary(source, "    ", "Gets a span of all defined instances.");
-        source.AppendLine(
-            "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
         source.Append("    public static global::System.ReadOnlySpan<")
               .Append(ctx.EnumTypeName)
-              .AppendLine("> Values => __values;");
+              .AppendLine("> Values");
+        source.AppendLine("    {");
+        source.AppendLine(
+            "        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+        source.AppendLine("        get => __values;");
+        source.AppendLine("    }");
         source.AppendLine();
 
         AppendXmlSummary(source, "    ", "Gets a read-only list of all defined instances.");
-        source.AppendLine(
-            "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
         source.Append("    public static global::System.Collections.Generic.IReadOnlyList<")
               .Append(ctx.EnumTypeName)
-              .AppendLine("> List => __list;");
+              .AppendLine("> List");
+        source.AppendLine("    {");
+        source.AppendLine(
+            "        [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+        source.AppendLine("        get => __list;");
+        source.AppendLine("    }");
         source.AppendLine();
     }
 
