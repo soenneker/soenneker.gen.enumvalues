@@ -427,7 +427,7 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine("    {");
         source.AppendLine("        if (name is null) { result = default!; return false; }");
         source.AppendLine();
-        source.AppendLine("        return TryFromName(name.AsSpan(), out result);");
+        source.AppendLine("        return TryFromName(global::System.MemoryExtensions.AsSpan(name), out result);");
         source.AppendLine();
         source.AppendLine("    }");
         source.AppendLine();
