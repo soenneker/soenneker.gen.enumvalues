@@ -11,10 +11,10 @@ public class TryFromNameBenchmark
     private readonly string _miss = "Unknown";
 
     [Benchmark(Baseline = true)]
-    public (ColorCode, ColorCode) TryFromName_String_Known()
+    public (Enums.ColorCode, Enums.ColorCode) TryFromName_String_Known()
     {
-        ColorCode.TryFromName(_red, out ColorCode r);
-        ColorCode.TryFromName(_blue, out ColorCode b);
+        Enums.ColorCode.TryFromName(_red, out Enums.ColorCode r);
+        Enums.ColorCode.TryFromName(_blue, out Enums.ColorCode b);
         return (r, b);
     }
 
@@ -37,7 +37,7 @@ public class TryFromNameBenchmark
     [Benchmark]
     public bool GenEnumValues_Miss()
     {
-        return ColorCode.TryFromName(_miss, out _);
+        return Enums.ColorCode.TryFromName(_miss, out _);
     }
 
     [Benchmark]

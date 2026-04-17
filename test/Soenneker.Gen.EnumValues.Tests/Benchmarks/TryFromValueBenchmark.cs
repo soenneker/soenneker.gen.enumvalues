@@ -11,10 +11,10 @@ public class TryFromValueBenchmark
     private readonly string _miss = "X";
 
     [Benchmark(Baseline = true)]
-    public (ColorCode, ColorCode) TryFromValue_String_Known()
+    public (Enums.ColorCode, Enums.ColorCode) TryFromValue_String_Known()
     {
-        ColorCode.TryFromValue(_r, out ColorCode r);
-        ColorCode.TryFromValue(_b, out ColorCode b);
+        Enums.ColorCode.TryFromValue(_r, out Enums.ColorCode r);
+        Enums.ColorCode.TryFromValue(_b, out Enums.ColorCode b);
         return (r, b);
     }
 
@@ -37,7 +37,7 @@ public class TryFromValueBenchmark
     [Benchmark]
     public bool GenEnumValues_Miss()
     {
-        return ColorCode.TryFromValue(_miss, out _);
+        return Enums.ColorCode.TryFromValue(_miss, out _);
     }
 
     [Benchmark]

@@ -1,4 +1,4 @@
-namespace Soenneker.Gen.EnumValues.Tests;
+namespace Soenneker.Gen.EnumValues.Tests.Enums;
 
 [EnumValue]
 public sealed partial class OrderStatus

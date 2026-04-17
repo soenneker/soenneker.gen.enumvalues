@@ -10,7 +10,7 @@ public class EnumValuesListBenchmark
     [Benchmark(Baseline = true)]
     public int GenEnumValues_Small()
     {
-        return ColorCode.List.Count;
+        return Enums.ColorCode.List.Count;
     }
 
     [Benchmark]

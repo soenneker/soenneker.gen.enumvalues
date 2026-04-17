@@ -1,4 +1,4 @@
-namespace Soenneker.Gen.EnumValues.Tests;
+namespace Soenneker.Gen.EnumValues.Tests.Enums;
 
 /// <summary>
 /// Composed type: own instances (None, Inset) plus all values from GlobalKeyword (Initial, Inherit, Unset).

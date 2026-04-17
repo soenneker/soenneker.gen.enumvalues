@@ -8,7 +8,7 @@ namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
 [SimpleJob]
 public class SerializationBenchmark
 {
-    private ColorCode _genValue = null!;
+    private Enums.ColorCode _genValue = null!;
     private ColorCodeIntellenum _intellenumValue = null!;
     private ColorCodeSmartEnum _smartEnumValue = null!;
     private JsonSerializerOptions _stjOptions = null!;
@@ -16,7 +16,7 @@ public class SerializationBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        _genValue = ColorCode.Red;
+        _genValue = Enums.ColorCode.Red;
         _intellenumValue = ColorCodeIntellenum.Red;
         _smartEnumValue = ColorCodeSmartEnum.Red;
         _stjOptions = new JsonSerializerOptions();
@@ -41,9 +41,9 @@ public class SerializationBenchmark
     }
 
     [Benchmark]
-    public ColorCode GenEnumValues_SystemTextJson_Deserialize()
+    public Enums.ColorCode GenEnumValues_SystemTextJson_Deserialize()
     {
-        return System.Text.Json.JsonSerializer.Deserialize<ColorCode>("\"R\"", _stjOptions)!;
+        return System.Text.Json.JsonSerializer.Deserialize<Enums.ColorCode>("\"R\"", _stjOptions)!;
     }
 
     [Benchmark]

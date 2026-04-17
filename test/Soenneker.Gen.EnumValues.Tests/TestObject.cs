@@ -2,5 +2,5 @@
 
 public class TestObject
 {
-    public ColorCode ColorCode { get; set; }
+    public Enums.ColorCode ColorCode { get; set; }
 }

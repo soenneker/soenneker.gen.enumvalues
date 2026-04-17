@@ -1,4 +1,4 @@
-namespace Soenneker.Gen.EnumValues.Tests;
+namespace Soenneker.Gen.EnumValues.Tests.Enums;
 
 /// <summary>
 /// Source enum-value type used by BoxShadowKeyword via [IncludeEnumValues].
