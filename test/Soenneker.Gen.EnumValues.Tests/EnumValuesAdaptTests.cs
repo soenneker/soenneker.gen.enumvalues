@@ -1,16 +1,15 @@
 using AwesomeAssertions;
 using Soenneker.Gen.EnumValues.Tests.Enums;
-using Xunit;
 
 namespace Soenneker.Gen.EnumValues.Tests;
 
 public sealed class EnumValuesAdaptTests
 {
-    public EnumValuesAdaptTests(ITestOutputHelper output)
+    public EnumValuesAdaptTests( output)
     {
     }
 
-    [Fact]
+    [Test]
     public void Adapt_should_adapt()
     {
         var testObject1 = new TestObject() { ColorCode = Enums.ColorCode.Blue };

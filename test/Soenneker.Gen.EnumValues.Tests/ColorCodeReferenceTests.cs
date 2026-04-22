@@ -1,15 +1,14 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using AwesomeAssertions;
 using Soenneker.Gen.EnumValues.Tests.Enums;
-using Xunit;
 
 namespace Soenneker.Gen.EnumValues.Tests;
 
 public sealed class ColorCodeReferenceTests
 {
-    [Fact]
+    [Test]
     public void ReferenceEquals_should_work_for_same_static_instance()
     {
         var blue = ColorCode.Blue;
@@ -19,7 +18,7 @@ public sealed class ColorCodeReferenceTests
         result.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ReferenceEquals_should_work_for_two_variables_pointing_to_same_instance()
     {
         var blue1 = ColorCode.Blue;
@@ -30,7 +29,7 @@ public sealed class ColorCodeReferenceTests
         result.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ReferenceEquals_should_be_false_for_different_static_instances()
     {
         var blue = ColorCode.Blue;
@@ -41,7 +40,7 @@ public sealed class ColorCodeReferenceTests
         result.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ReferenceEquals_should_be_true_when_pulled_from_collection()
     {
         var list = new List<ColorCode> { ColorCode.Blue };
@@ -53,7 +52,7 @@ public sealed class ColorCodeReferenceTests
         result.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ReferenceEquals_should_be_true_when_returned_from_method_without_rehydration()
     {
         ColorCode blue = GetBlue();
@@ -63,7 +62,7 @@ public sealed class ColorCodeReferenceTests
         result.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Equals_and_ReferenceEquals_should_both_be_true_for_same_static_instance()
     {
         var blue1 = ColorCode.Blue;
@@ -73,7 +72,7 @@ public sealed class ColorCodeReferenceTests
         ReferenceEquals(blue1, blue2).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Null_reference_comparisons_should_behave_correctly()
     {
         ColorCode? left = null;
@@ -84,7 +83,7 @@ public sealed class ColorCodeReferenceTests
         ReferenceEquals(ColorCode.Blue, right).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ReferenceEquals_should_be_true_after_casting_to_object()
     {
         object blue = ColorCode.Blue;
@@ -94,7 +93,7 @@ public sealed class ColorCodeReferenceTests
         result.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Dictionary_lookup_should_return_same_reference_instance()
     {
         var dict = new Dictionary<string, ColorCode>
@@ -107,7 +106,7 @@ public sealed class ColorCodeReferenceTests
         ReferenceEquals(value, ColorCode.Blue).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Linq_First_should_return_same_reference_instance()
     {
         var values = new[] { ColorCode.Red, ColorCode.Blue };
@@ -117,7 +116,7 @@ public sealed class ColorCodeReferenceTests
         ReferenceEquals(result, ColorCode.Blue).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void JsonSerializer_deserialize_should_not_preserve_reference_by_default_for_normal_reference_types()
     {
         var json = JsonSerializer.Serialize(ColorCode.Blue);
@@ -128,7 +127,7 @@ public sealed class ColorCodeReferenceTests
         ReferenceEquals(deserialized, ColorCode.Blue).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void JsonSerializer_should_preserve_reference_only_if_custom_converter_rehydrates_static_instance()
     {
         var json = JsonSerializer.Serialize(ColorCode.Blue);
@@ -138,7 +137,7 @@ public sealed class ColorCodeReferenceTests
         ReferenceEquals(deserialized, ColorCode.Blue).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void FromName_should_match_reference()
     {
         var original = ColorCode.Blue;

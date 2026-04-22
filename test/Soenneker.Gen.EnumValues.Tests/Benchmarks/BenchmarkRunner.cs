@@ -1,19 +1,18 @@
 using BenchmarkDotNet.Reports;
 using Soenneker.Benchmarking.Extensions.Summary;
-using Soenneker.Facts.Local;
+using Soenneker.Tests.Attributes.Local;
 using Soenneker.Tests.Benchmark;
 using System.Threading.Tasks;
-using Xunit;
 
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
 
 public class BenchmarkRunner : BenchmarkTest
 {
-    public BenchmarkRunner(ITestOutputHelper outputHelper) : base(outputHelper)
+    public BenchmarkRunner() : base()
     {
     }
 
-    //[LocalFact]
+    //[LocalOnly]
     public async ValueTask EnumValuesListBenchmark()
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<EnumValuesListBenchmark>(DefaultConf);
@@ -21,7 +20,7 @@ public class BenchmarkRunner : BenchmarkTest
         await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
     }
 
-   // [LocalFact]
+   // [LocalOnly]
     public async ValueTask TryFromNameBenchmark()
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<TryFromNameBenchmark>(DefaultConf);
@@ -29,7 +28,7 @@ public class BenchmarkRunner : BenchmarkTest
         await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
     }
 
-  //  [LocalFact]
+  //  [LocalOnly]
     public async ValueTask TryFromValueBenchmark()
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<TryFromValueBenchmark>(DefaultConf);
@@ -37,7 +36,7 @@ public class BenchmarkRunner : BenchmarkTest
         await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
     }
 
-    //[LocalFact]
+    //[LocalOnly]
     public async ValueTask SerializationBenchmark()
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<SerializationBenchmark>(DefaultConf);

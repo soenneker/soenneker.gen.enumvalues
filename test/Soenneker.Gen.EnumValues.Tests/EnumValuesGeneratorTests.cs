@@ -1,17 +1,16 @@
 using System;
 using AwesomeAssertions;
 using System.Text.Json;
-using Xunit;
 
 namespace Soenneker.Gen.EnumValues.Tests;
 
 public sealed class EnumValuesGeneratorTests
 {
-    public EnumValuesGeneratorTests(ITestOutputHelper output)
+    public EnumValuesGeneratorTests( output)
     {
     }
 
-    [Fact]
+    [Test]
     public void Int_default_attribute_generates_fast_lookups()
     {
         Enums.OrderStatus.TryFromValue(1, out Enums.OrderStatus? pending).Should().BeTrue();
@@ -26,7 +25,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.OrderStatus.List.Count.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public void Generic_string_attribute_generates_fast_lookups()
     {
         Enums.ColorCode.TryFromValue("R", out Enums.ColorCode? red).Should().BeTrue();
@@ -43,7 +42,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.ColorCode.List.Count.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public void Json_round_trips_enum_values()
     {
         string intJson = JsonSerializer.Serialize(Enums.OrderStatus.Pending);
@@ -59,7 +58,7 @@ public sealed class EnumValuesGeneratorTests
         stringValue.Should().BeSameAs(Enums.ColorCode.Red);
     }
 
-    [Fact]
+    [Test]
     public void Json_throws_on_unknown_value()
     {
         Action act1 = () => JsonSerializer.Deserialize<Enums.OrderStatus>("999");
@@ -69,7 +68,7 @@ public sealed class EnumValuesGeneratorTests
         act2.Should().Throw<JsonException>();
     }
 
-    [Fact]
+    [Test]
     public void Struct_int_default_attribute_generates_fast_lookups()
     {
         Enums.PriorityLevel.TryFromValue(0, out Enums.PriorityLevel low).Should().BeTrue();
@@ -84,7 +83,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.PriorityLevel.List.Count.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public void Struct_generic_string_attribute_generates_fast_lookups()
     {
         Enums.SizeCode.TryFromValue("S", out Enums.SizeCode small).Should().BeTrue();
@@ -101,7 +100,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.SizeCode.List.Count.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public void Struct_Json_round_trips_enum_values()
     {
         string intJson = JsonSerializer.Serialize(Enums.PriorityLevel.Low);
@@ -117,7 +116,7 @@ public sealed class EnumValuesGeneratorTests
         stringValue.Should().Be(Enums.SizeCode.Small);
     }
 
-    [Fact]
+    [Test]
     public void Struct_Json_throws_on_unknown_value()
     {
         Action act1 = () => JsonSerializer.Deserialize<Enums.PriorityLevel>("999");
@@ -127,7 +126,7 @@ public sealed class EnumValuesGeneratorTests
         act2.Should().Throw<JsonException>();
     }
 
-    [Fact]
+    [Test]
     public void Value_constants_can_be_used_for_switch_labels()
     {
         const string colorCode = Enums.ColorCode.RedValue;
@@ -153,7 +152,7 @@ public sealed class EnumValuesGeneratorTests
         matchedStatus.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Newtonsoft_json_round_trips_enum_values()
     {
         string intJson = global::Newtonsoft.Json.JsonConvert.SerializeObject(Enums.OrderStatus.Pending);
@@ -169,7 +168,7 @@ public sealed class EnumValuesGeneratorTests
         stringValue.Should().BeSameAs(Enums.ColorCode.Red);
     }
 
-    [Fact]
+    [Test]
     public void Name_is_generated_for_class_enum_values()
     {
         Enums.ColorCode.Red.Name.Should().Be("Red");
@@ -179,7 +178,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.OrderStatus.Completed.Name.Should().Be("Completed");
     }
 
-    [Fact]
+    [Test]
     public void Name_is_generated_for_class_enum_instances()
     {
         Enums.ColorCode variable = Enums.ColorCode.Red;
@@ -187,7 +186,7 @@ public sealed class EnumValuesGeneratorTests
                 .Be("Red");
     }
 
-    [Fact]
+    [Test]
     public void Name_is_generated_for_class_enum_on_objects()
     {
         var testObject = new TestObject();
@@ -197,7 +196,7 @@ public sealed class EnumValuesGeneratorTests
                   .Be("Red");
     }
 
-    [Fact]
+    [Test]
     public void Name_is_generated_for_struct_enum_values()
     {
         Enums.SizeCode.Small.Name.Should().Be("Small");
@@ -207,14 +206,14 @@ public sealed class EnumValuesGeneratorTests
         Enums.PriorityLevel.High.Name.Should().Be("High");
     }
 
-    [Fact]
+    [Test]
     public void Name_returns_empty_string_for_default_struct()
     {
         default(Enums.PriorityLevel).Name.Should().Be("Low");
         default(Enums.SizeCode).Name.Should().Be("");
     }
 
-    [Fact]
+    [Test]
     public void All_enum_value_instances_have_Name_property_set()
     {
         foreach (Enums.ColorCode instance in Enums.ColorCode.List)
@@ -230,7 +229,7 @@ public sealed class EnumValuesGeneratorTests
             instance.Name.Should().NotBeNullOrEmpty();
     }
 
-    [Fact]
+    [Test]
     public void Name_property_matches_nameof_for_enum_value_members()
     {
         nameof(Enums.ColorCode.Red).Should().Be(Enums.ColorCode.Red.Name);
@@ -248,7 +247,7 @@ public sealed class EnumValuesGeneratorTests
 
     // --- EnumValue<string>: implicit conversion and string equality ---
 
-    [Fact]
+    [Test]
     public void String_enum_implicit_conversion_to_string_works()
     {
         string red = Enums.ColorCode.Red;
@@ -258,7 +257,7 @@ public sealed class EnumValuesGeneratorTests
         blue.Should().Be("B");
     }
 
-    [Fact]
+    [Test]
     public void String_Equals_accepts_enum_via_implicit_conversion()
     {
         string.Equals("R", Enums.ColorCode.Red, StringComparison.Ordinal).Should().BeTrue();
@@ -267,7 +266,7 @@ public sealed class EnumValuesGeneratorTests
         string.Equals("B", Enums.ColorCode.Red, StringComparison.Ordinal).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void String_enum_equality_with_string_both_directions()
     {
         (Enums.ColorCode.Red == "R").Should().BeTrue();
@@ -281,7 +280,7 @@ public sealed class EnumValuesGeneratorTests
         ("B" != Enums.ColorCode.Red).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void String_enum_equality_with_null_string()
     {
         string? n = null;
@@ -291,7 +290,7 @@ public sealed class EnumValuesGeneratorTests
         (n != Enums.ColorCode.Red).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Singleton_equals_should_be_true()
     {
         var testObject1 = new TestObject { ColorCode = Enums.ColorCode.Red };
@@ -301,7 +300,7 @@ public sealed class EnumValuesGeneratorTests
                                                         .BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void String_enum_Equals_and_GetHashCode_by_value()
     {
         Enums.ColorCode red1 = Enums.ColorCode.FromValue("R");
@@ -313,7 +312,7 @@ public sealed class EnumValuesGeneratorTests
 
     // --- EnumValue<int>: IEquatable, ==/!= with int, ToString, explicit conversion ---
 
-    [Fact]
+    [Test]
     public void Int_enum_implements_IEquatable_TSelf_class()
     {
         Enums.OrderStatus pending = Enums.OrderStatus.Pending;
@@ -323,7 +322,7 @@ public sealed class EnumValuesGeneratorTests
         completed.Equals(Enums.OrderStatus.Completed).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Int_enum_implements_IEquatable_TSelf_struct()
     {
         Enums.PriorityLevel low = Enums.PriorityLevel.Low;
@@ -333,7 +332,7 @@ public sealed class EnumValuesGeneratorTests
         high.Equals(Enums.PriorityLevel.High).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Int_enum_implements_IEquatable_int()
     {
         Enums.OrderStatus.Pending.Equals(1).Should().BeTrue();
@@ -345,7 +344,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.PriorityLevel.High.Equals(1).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Int_enum_equality_TSelf_TSelf()
     {
         Enums.OrderStatus pending = Enums.OrderStatus.Pending;
@@ -361,7 +360,7 @@ public sealed class EnumValuesGeneratorTests
         (low == high).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void Int_enum_equality_TSelf_int_both_directions()
     {
         (Enums.OrderStatus.Pending == 1).Should().BeTrue();
@@ -376,7 +375,7 @@ public sealed class EnumValuesGeneratorTests
         (1 == Enums.PriorityLevel.High).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void Int_enum_ToString_uses_invariant_culture()
     {
         Enums.OrderStatus.Pending.ToString().Should().Be("1");
@@ -385,7 +384,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.PriorityLevel.High.ToString().Should().Be("1");
     }
 
-    [Fact]
+    [Test]
     public void Int_enum_explicit_conversion_to_int()
     {
         ((int)Enums.OrderStatus.Pending).Should().Be(1);
@@ -394,7 +393,7 @@ public sealed class EnumValuesGeneratorTests
         ((int)Enums.PriorityLevel.High).Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public void Int_enum_override_Equals_object_and_GetHashCode()
     {
         Enums.OrderStatus pending = Enums.OrderStatus.FromValue(1);
@@ -408,7 +407,7 @@ public sealed class EnumValuesGeneratorTests
 
     // --- IncludeEnumValues: composed type with own + included instances ---
 
-    [Fact]
+    [Test]
     public void IncludeEnumValues_List_contains_own_then_included_in_order()
     {
         Enums.BoxShadowKeyword.List.Count.Should().Be(5); // None, Inset (own) + Initial, Inherit, Unset (from GlobalKeyword)
@@ -421,7 +420,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.BoxShadowKeyword.List[4].Should().BeSameAs(Enums.BoxShadowKeyword.Unset);
     }
 
-    [Fact]
+    [Test]
     public void IncludeEnumValues_TryFromValue_works_for_own_and_included()
     {
         Enums.BoxShadowKeyword.TryFromValue("none", out Enums.BoxShadowKeyword? none).Should().BeTrue();
@@ -442,7 +441,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.BoxShadowKeyword.TryFromValue("unknown", out Enums.BoxShadowKeyword? _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IncludeEnumValues_TryFromName_works_for_own_and_included()
     {
         Enums.BoxShadowKeyword.TryFromName("None", out Enums.BoxShadowKeyword? none).Should().BeTrue();
@@ -454,14 +453,14 @@ public sealed class EnumValuesGeneratorTests
         Enums.BoxShadowKeyword.TryFromName("Unknown", out Enums.BoxShadowKeyword? _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IncludeEnumValues_FromValue_and_FromName_work_for_included()
     {
         Enums.BoxShadowKeyword.FromValue("initial").Should().BeSameAs(Enums.BoxShadowKeyword.Initial);
         Enums.BoxShadowKeyword.FromName("Initial").Should().BeSameAs(Enums.BoxShadowKeyword.Initial);
     }
 
-    [Fact]
+    [Test]
     public void IncludeEnumValues_Json_round_trips_own_and_included()
     {
         string noneJson = JsonSerializer.Serialize(Enums.BoxShadowKeyword.None);
@@ -473,7 +472,7 @@ public sealed class EnumValuesGeneratorTests
         JsonSerializer.Deserialize<Enums.BoxShadowKeyword>("\"initial\"").Should().BeSameAs(Enums.BoxShadowKeyword.Initial);
     }
 
-    [Fact]
+    [Test]
     public void IncludeEnumValues_Name_and_Value_match_for_included_instances()
     {
         Enums.BoxShadowKeyword.Initial.Name.Should().Be("Initial");
@@ -483,7 +482,7 @@ public sealed class EnumValuesGeneratorTests
         Enums.BoxShadowKeyword.None.Value.Should().Be("none");
     }
 
-    [Fact]
+    [Test]
     public void IncludeEnumValues_included_instance_is_distinct_from_source_type()
     {
         Enums.BoxShadowKeyword.Initial.Should().NotBeSameAs(Enums.GlobalKeyword.Initial);
