@@ -5,7 +5,7 @@ namespace Soenneker.Gen.EnumValues.Tests;
 
 public sealed class EnumValuesAdaptTests
 {
-    public EnumValuesAdaptTests( output)
+    public EnumValuesAdaptTests()
     {
     }
 

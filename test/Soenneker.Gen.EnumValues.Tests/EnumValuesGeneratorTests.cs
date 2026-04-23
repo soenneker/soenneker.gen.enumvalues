@@ -6,7 +6,7 @@ namespace Soenneker.Gen.EnumValues.Tests;
 
 public sealed class EnumValuesGeneratorTests
 {
-    public EnumValuesGeneratorTests( output)
+    public EnumValuesGeneratorTests()
     {
     }
 

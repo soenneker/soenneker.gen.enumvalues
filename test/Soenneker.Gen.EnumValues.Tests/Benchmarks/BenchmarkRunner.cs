@@ -1,9 +1,3 @@
-using BenchmarkDotNet.Reports;
-using Soenneker.Benchmarking.Extensions.Summary;
-using Soenneker.Tests.Attributes.Local;
-using Soenneker.Tests.Benchmark;
-using System.Threading.Tasks;
-
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
 
 public class BenchmarkRunner : BenchmarkTest
@@ -17,7 +11,7 @@ public class BenchmarkRunner : BenchmarkTest
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<EnumValuesListBenchmark>(DefaultConf);
 
-        await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
+        await summary.OutputSummaryToLog();
     }
 
    // [LocalOnly]
@@ -25,7 +19,7 @@ public class BenchmarkRunner : BenchmarkTest
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<TryFromNameBenchmark>(DefaultConf);
 
-        await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
+        await summary.OutputSummaryToLog();
     }
 
   //  [LocalOnly]
@@ -33,7 +27,7 @@ public class BenchmarkRunner : BenchmarkTest
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<TryFromValueBenchmark>(DefaultConf);
 
-        await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
+        await summary.OutputSummaryToLog();
     }
 
     //[LocalOnly]
@@ -41,6 +35,8 @@ public class BenchmarkRunner : BenchmarkTest
     {
         Summary summary = BenchmarkDotNet.Running.BenchmarkRunner.Run<SerializationBenchmark>(DefaultConf);
 
-        await summary.OutputSummaryToLog(OutputHelper, CancellationToken);
+        await summary.OutputSummaryToLog();
     }
 }
+
+
