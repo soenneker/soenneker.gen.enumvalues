@@ -30,7 +30,7 @@
         <PackageReference Include="Intellenum" Version="2.0.1" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
         <PackageReference Include="Soenneker.Tests.Attributes.Local" Version="4.0.0" />
-        <PackageReference Include="Soenneker.Gen.Adapt" Version="4.0.76">
+        <PackageReference Include="Soenneker.Gen.Adapt" Version="4.0.77">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
