@@ -11,7 +11,7 @@ public sealed class ColorCodeReferenceTests
     [Test]
     public void ReferenceEquals_should_work_for_same_static_instance()
     {
-        var blue = ColorCode.Blue;
+        ColorCode blue = ColorCode.Blue;
 
         bool result = ReferenceEquals(blue, ColorCode.Blue);
 
@@ -21,8 +21,8 @@ public sealed class ColorCodeReferenceTests
     [Test]
     public void ReferenceEquals_should_work_for_two_variables_pointing_to_same_instance()
     {
-        var blue1 = ColorCode.Blue;
-        var blue2 = blue1;
+        ColorCode blue1 = ColorCode.Blue;
+        ColorCode blue2 = blue1;
 
         bool result = ReferenceEquals(blue1, blue2);
 
@@ -32,8 +32,8 @@ public sealed class ColorCodeReferenceTests
     [Test]
     public void ReferenceEquals_should_be_false_for_different_static_instances()
     {
-        var blue = ColorCode.Blue;
-        var red = ColorCode.Red;
+        ColorCode blue = ColorCode.Blue;
+        ColorCode red = ColorCode.Red;
 
         bool result = ReferenceEquals(blue, red);
 
@@ -65,8 +65,8 @@ public sealed class ColorCodeReferenceTests
     [Test]
     public void Equals_and_ReferenceEquals_should_both_be_true_for_same_static_instance()
     {
-        var blue1 = ColorCode.Blue;
-        var blue2 = ColorCode.Blue;
+        ColorCode blue1 = ColorCode.Blue;
+        ColorCode blue2 = ColorCode.Blue;
 
         blue1.Equals(blue2).Should().BeTrue();
         ReferenceEquals(blue1, blue2).Should().BeTrue();
@@ -109,7 +109,7 @@ public sealed class ColorCodeReferenceTests
     [Test]
     public void Linq_First_should_return_same_reference_instance()
     {
-        var values = new[] { ColorCode.Red, ColorCode.Blue };
+        ColorCode[] values = new[] { ColorCode.Red, ColorCode.Blue };
 
         ColorCode result = values.First(x => x == ColorCode.Blue);
 
@@ -119,8 +119,8 @@ public sealed class ColorCodeReferenceTests
     [Test]
     public void JsonSerializer_deserialize_should_not_preserve_reference_by_default_for_normal_reference_types()
     {
-        var json = JsonSerializer.Serialize(ColorCode.Blue);
-        ColorCode? deserialized = JsonSerializer.Deserialize<ColorCode>(json);
+        string json = JsonSerializer.Serialize(ColorCode.Blue);
+        var deserialized = JsonSerializer.Deserialize<ColorCode>(json);
 
         deserialized.Should().NotBeNull();
 
@@ -130,8 +130,8 @@ public sealed class ColorCodeReferenceTests
     [Test]
     public void JsonSerializer_should_preserve_reference_only_if_custom_converter_rehydrates_static_instance()
     {
-        var json = JsonSerializer.Serialize(ColorCode.Blue);
-        ColorCode? deserialized = JsonSerializer.Deserialize<ColorCode>(json);
+        string json = JsonSerializer.Serialize(ColorCode.Blue);
+        var deserialized = JsonSerializer.Deserialize<ColorCode>(json);
 
         deserialized.Should().NotBeNull();
         ReferenceEquals(deserialized, ColorCode.Blue).Should().BeTrue();
@@ -140,8 +140,8 @@ public sealed class ColorCodeReferenceTests
     [Test]
     public void FromName_should_match_reference()
     {
-        var original = ColorCode.Blue;
-        var clone = ColorCode.FromName("Blue");
+        ColorCode original = ColorCode.Blue;
+        ColorCode clone = ColorCode.FromName("Blue");
 
         ReferenceEquals(original, clone).Should().BeTrue();
 

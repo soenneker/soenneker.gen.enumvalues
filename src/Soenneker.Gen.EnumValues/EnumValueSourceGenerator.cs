@@ -393,7 +393,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 
         List<EnumInstance> ownInstances = GatherInstances(context, compilation, enumType, valueType);
 
-        List<EnumInstance> instances = new List<EnumInstance>(ownInstances);
+        var instances = new List<EnumInstance>(ownInstances);
         ImmutableArray<INamedTypeSymbol> includeTypes = GetIncludeEnumValuesSourceTypes(enumType, compilation);
         foreach (INamedTypeSymbol sourceType in includeTypes)
         {
