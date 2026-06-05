@@ -11,6 +11,9 @@ using Soenneker.Gen.EnumValues.Dtos;
 
 namespace Soenneker.Gen.EnumValues;
 
+/// <summary>
+/// Represents the enum value source generator.
+/// </summary>
 [Generator]
 public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 {
@@ -56,6 +59,10 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         "Type '{0}' declares constructor '{1}' which would make generated enum values open. Remove custom constructors and let the generator emit the private (value, id) constructor.",
         category: "EnumValueGenerator", defaultSeverity: DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    /// <summary>
+    /// Executes the initialize operation.
+    /// </summary>
+    /// <param name="context">The context.</param>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterSourceOutput(context.CompilationProvider, static (sourceProductionContext, compilation) =>

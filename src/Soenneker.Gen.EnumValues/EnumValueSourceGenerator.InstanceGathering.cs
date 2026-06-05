@@ -10,6 +10,9 @@ using Soenneker.Gen.EnumValues.Dtos;
 
 namespace Soenneker.Gen.EnumValues;
 
+/// <summary>
+/// Represents the enum value source generator.
+/// </summary>
 public sealed partial class EnumValueSourceGenerator
 {
     private static bool SupportsNewtonsoft(Compilation compilation)

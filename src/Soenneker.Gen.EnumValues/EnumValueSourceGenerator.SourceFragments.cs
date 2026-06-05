@@ -4,6 +4,9 @@ using System.Text;
 
 namespace Soenneker.Gen.EnumValues;
 
+/// <summary>
+/// Represents the enum value source generator.
+/// </summary>
 public sealed partial class EnumValueSourceGenerator
 {
     private static string BuildReadRawValueCode(ITypeSymbol valueType)
