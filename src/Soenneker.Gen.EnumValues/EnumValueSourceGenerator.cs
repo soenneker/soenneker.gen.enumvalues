@@ -17,6 +17,8 @@ namespace Soenneker.Gen.EnumValues;
 [Generator]
 public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 {
+    private const string _inliningPropertyName = "build_property.EnumValuesInlining";
+
     private static readonly DiagnosticDescriptor _typeMustBePartialDescriptor = new(id: "SEV001", title: "EnumValue type must be partial",
         messageFormat: "Type '{0}' must be declared partial to use [EnumValue]", category: "EnumValueGenerator", defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -77,13 +79,17 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
                                                                                   }, static (syntaxContext, _) => TryGetCandidate(syntaxContext))
                                                                               .Where(static candidate => candidate is not null);
 
-        IncrementalValueProvider<(Compilation compilation, ImmutableArray<EnumTypeCandidate?> candidates)> combined =
-            context.CompilationProvider.Combine(typeCandidates.Collect());
+        IncrementalValueProvider<string?> sizeDependentMethodImplOption = context.AnalyzerConfigOptionsProvider.Select(static (provider, _) =>
+            GetSizeDependentMethodImplOption(provider.GlobalOptions.TryGetValue(_inliningPropertyName, out string? value) ? value : null));
+
+        IncrementalValueProvider<((Compilation compilation, ImmutableArray<EnumTypeCandidate?> candidates) source, string? sizeDependentMethodImplOption)>
+            combined = context.CompilationProvider.Combine(typeCandidates.Collect())
+                              .Combine(sizeDependentMethodImplOption);
 
         context.RegisterSourceOutput(combined, static (sourceProductionContext, tuple) =>
         {
-            Compilation compilation = tuple.compilation;
-            ImmutableArray<EnumTypeCandidate?> candidates = tuple.candidates;
+            Compilation compilation = tuple.source.compilation;
+            ImmutableArray<EnumTypeCandidate?> candidates = tuple.source.candidates;
 
             if (candidates.IsDefaultOrEmpty)
                 return;
@@ -100,9 +106,23 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
                 if (!seen.Add(enumType))
                     continue;
 
-                ProcessCandidate(sourceProductionContext, compilation, enumType, candidate.ValueType);
+                ProcessCandidate(sourceProductionContext, compilation, enumType, candidate.ValueType, tuple.sizeDependentMethodImplOption);
             }
         });
+    }
+
+    private static string? GetSizeDependentMethodImplOption(string? value)
+    {
+        if (string.Equals(value, "AggressiveInlining", StringComparison.OrdinalIgnoreCase))
+            return "AggressiveInlining";
+
+        if (string.Equals(value, "None", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (string.Equals(value, "NoInlining", StringComparison.OrdinalIgnoreCase))
+            return "NoInlining";
+
+        return "AggressiveInlining";
     }
 
     private static EnumTypeCandidate? TryGetCandidate(GeneratorSyntaxContext syntaxContext)
@@ -370,7 +390,8 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         return false;
     }
 
-    private static void ProcessCandidate(SourceProductionContext context, Compilation compilation, INamedTypeSymbol enumType, INamedTypeSymbol valueType)
+    private static void ProcessCandidate(SourceProductionContext context, Compilation compilation, INamedTypeSymbol enumType, INamedTypeSymbol valueType,
+        string? sizeDependentMethodImplOption)
     {
         if (enumType.ContainingType is not null)
         {
@@ -455,7 +476,8 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         bool hasNameProperty = HasNameProperty(enumType);
 
         bool supportsNewtonsoft = SupportsNewtonsoft(compilation);
-        string source = BuildSource(enumType, valueType, instances, hasValueProperty, hasValueIdConstructor, hasNameProperty, supportsNewtonsoft);
+        string source = BuildSource(enumType, valueType, instances, hasValueProperty, hasValueIdConstructor, hasNameProperty, supportsNewtonsoft,
+            sizeDependentMethodImplOption);
         context.AddSource($"{enumType.Name}.EnumValues.g.cs", SourceText.From(source, Encoding.UTF8));
     }
 
@@ -471,7 +493,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
     }
 
     private static string BuildSource(INamedTypeSymbol enumType, INamedTypeSymbol valueType, List<EnumInstance> instances, bool hasValueProperty,
-        bool hasValueIdConstructor, bool hasNameProperty, bool supportsNewtonsoft)
+        bool hasValueIdConstructor, bool hasNameProperty, bool supportsNewtonsoft, string? sizeDependentMethodImplOption)
     {
         string enumTypeName = enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         string valueTypeName = valueType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -491,7 +513,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
                                                                    .ToList(), isStringValue
                 ? instances.Select(static instance => (instance.StringValue ?? string.Empty, instance.Name))
                            .ToList()
-                : new List<(string Text, string TargetName)>(), BuildReadRawValueCode(valueType), BuildWriteValueCode(valueType));
+                : new List<(string Text, string TargetName)>(), BuildReadRawValueCode(valueType), BuildWriteValueCode(valueType), sizeDependentMethodImplOption);
 
         var source = new StringBuilder();
         source.AppendLine("// <auto-generated/>");

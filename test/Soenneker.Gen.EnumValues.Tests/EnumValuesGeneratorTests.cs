@@ -1,5 +1,6 @@
 using System;
 using AwesomeAssertions;
+using System.Reflection;
 using System.Text.Json;
 
 namespace Soenneker.Gen.EnumValues.Tests;
@@ -8,6 +9,26 @@ public sealed class EnumValuesGeneratorTests
 {
     public EnumValuesGeneratorTests()
     {
+    }
+
+    [Test]
+    public void Generated_size_dependent_methods_are_not_inlined()
+    {
+        AssertNoInlining(typeof(Enums.ColorCode), nameof(Enums.ColorCode.TryFromValue), typeof(string), typeof(Enums.ColorCode).MakeByRefType());
+        AssertNoInlining(typeof(Enums.ColorCode), nameof(Enums.ColorCode.TryFromValue), typeof(ReadOnlySpan<char>), typeof(Enums.ColorCode).MakeByRefType());
+        AssertNoInlining(typeof(Enums.ColorCode), nameof(Enums.ColorCode.TryFromName), typeof(string), typeof(Enums.ColorCode).MakeByRefType());
+        AssertNoInlining(typeof(Enums.ColorCode), nameof(Enums.ColorCode.TryFromName), typeof(ReadOnlySpan<char>), typeof(Enums.ColorCode).MakeByRefType());
+        AssertNoInlining(typeof(Enums.ColorCode), nameof(Enums.ColorCode.Equals), typeof(string));
+        AssertNoInlining(typeof(Enums.OrderStatus), nameof(Enums.OrderStatus.TryFromValue), typeof(int), typeof(Enums.OrderStatus).MakeByRefType());
+    }
+
+    private static void AssertNoInlining(Type type, string methodName, params Type[] parameterTypes)
+    {
+        MethodInfo method = type.GetMethod(methodName, parameterTypes)!;
+        MethodImplAttributes flags = method.MethodImplementationFlags;
+
+        (flags & MethodImplAttributes.NoInlining).Should().Be(MethodImplAttributes.NoInlining);
+        (flags & MethodImplAttributes.AggressiveInlining).Should().Be(0);
     }
 
     [Test]

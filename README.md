@@ -14,6 +14,18 @@ Generate value objects with fast lookup APIs, switch-friendly constants, and bui
 dotnet add package Soenneker.Gen.EnumValues
 ```
 
+## Inlining configuration
+
+Generated parsing methods and string equality switches use `AggressiveInlining` by default. Projects targeting AOT environments where large generated methods should remain isolated can opt into `NoInlining`:
+
+```xml
+<PropertyGroup>
+  <EnumValuesInlining>NoInlining</EnumValuesInlining>
+</PropertyGroup>
+```
+
+Supported values are `AggressiveInlining` (default), `NoInlining`, and `None`. `None` emits no `MethodImpl` attribute on those size-dependent methods. This setting is applied when the project containing the enum-value types is compiled; it cannot change methods already compiled into a referenced package.
+
 ## Usage
 
 Annotate a partial type with `[EnumValue]` (defaults to `int`) or `[EnumValue<T>]`:

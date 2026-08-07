@@ -6,6 +6,7 @@
         <IsPackable>false</IsPackable>
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+        <EnumValuesInlining>NoInlining</EnumValuesInlining>
     </PropertyGroup>
 
     <ItemGroup>
@@ -39,8 +40,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\Soenneker.Gen.EnumValues\Soenneker.Gen.EnumValues.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\src\Soenneker.Gen.EnumValues\Soenneker.Gen.EnumValues.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
+  <Target Name="RemovePackagedEnumValuesAnalyzer" BeforeTargets="_HandlePackageFileConflicts">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Analyzer.NuGetPackageId)' == 'Soenneker.Gen.EnumValues'" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="EnumValuesInlining" />
+  </ItemGroup>
   <ItemGroup>
     <Compile Remove="Benchmarks\**\*.cs" />
     <Compile Remove="Benchmarking\**\*.cs" />
