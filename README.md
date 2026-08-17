@@ -14,18 +14,6 @@ Generate value objects with fast lookup APIs, switch-friendly constants, and bui
 dotnet add package Soenneker.Gen.EnumValues
 ```
 
-## Inlining configuration
-
-Generated parsing methods and string equality switches use `AggressiveInlining` by default. Projects targeting AOT environments where large generated methods should remain isolated can opt into `NoInlining`:
-
-```xml
-<PropertyGroup>
-  <EnumValuesInlining>NoInlining</EnumValuesInlining>
-</PropertyGroup>
-```
-
-Supported values are `AggressiveInlining` (default), `NoInlining`, and `None`. `None` emits no `MethodImpl` attribute on those size-dependent methods. This setting is applied when the project containing the enum-value types is compiled; it cannot change methods already compiled into a referenced package.
-
 ## Usage
 
 Annotate a partial type with `[EnumValue]` (defaults to `int`) or `[EnumValue<T>]`:
@@ -148,6 +136,18 @@ public sealed partial class SortDirection
 
 - **Value collision:** If the same value appears in both the target and an included type, or in two included types, the generator reports an error (e.g. *Duplicate enum value 'none' in SortDirection from CommonKeyword*).
 - **Name collision:** If the target (or an earlier included type) already has a member with the same name as an included instance, the generator reports an error (e.g. *Member name 'None' in SortDirection conflicts with included member from CommonKeyword*).
+
+## Inlining configuration
+
+Generated parsing methods and string equality switches use `AggressiveInlining` by default. Projects targeting AOT environments where large generated methods should remain isolated can opt into `NoInlining`:
+
+```xml
+<PropertyGroup>
+  <EnumValuesInlining>NoInlining</EnumValuesInlining>
+</PropertyGroup>
+```
+
+Supported values are `AggressiveInlining` (default), `NoInlining`, and `None`. `None` emits no `MethodImpl` attribute on those size-dependent methods. This setting is applied when the project containing the enum-value types is compiled; it cannot change methods already compiled into a referenced package.
 
 ## Notes
 
