@@ -51,8 +51,7 @@
     <CompilerVisibleProperty Include="EnumValuesInlining" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="Benchmarks\**\*.cs" />
-    <Compile Remove="Benchmarking\**\*.cs" />
+    <Compile Remove="Benchmarking\**\*.cs" Condition="'$(RunBenchmarks)' != 'true'" />
   </ItemGroup>
 </Project>
 

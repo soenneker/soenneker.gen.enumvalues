@@ -139,7 +139,7 @@ public sealed partial class SortDirection
 
 ## Inlining configuration
 
-Generated parsing methods and string equality switches use `AggressiveInlining` by default. Projects targeting AOT environments where large generated methods should remain isolated can opt into `NoInlining`:
+Generated parsing methods use size-aware inlining by default: methods for types with up to eight members use `AggressiveInlining`, while larger lookup methods use `NoInlining` to limit caller and instruction-cache growth. You can override this behavior explicitly:
 
 ```xml
 <PropertyGroup>
@@ -147,7 +147,7 @@ Generated parsing methods and string equality switches use `AggressiveInlining` 
 </PropertyGroup>
 ```
 
-Supported values are `AggressiveInlining` (default), `NoInlining`, and `None`. `None` emits no `MethodImpl` attribute on those size-dependent methods. This setting is applied when the project containing the enum-value types is compiled; it cannot change methods already compiled into a referenced package.
+Supported values are `AggressiveInlining`, `NoInlining`, and `None`. `None` emits no `MethodImpl` attribute on those size-dependent methods. When the property is omitted, the size-aware default is used. This setting is applied when the project containing the enum-value types is compiled; it cannot change methods already compiled into a referenced package.
 
 ## Notes
 

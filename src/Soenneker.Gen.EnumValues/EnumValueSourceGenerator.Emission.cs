@@ -8,13 +8,20 @@ namespace Soenneker.Gen.EnumValues;
 /// </summary>
 public sealed partial class EnumValueSourceGenerator
 {
+    private const int _aggressiveInliningInstanceThreshold = 8;
+    private const int _stjDispatchInstanceThreshold = 8;
+
     private static void AppendSizeDependentMethodImplAttribute(StringBuilder source, in EnumSourceBuildContext ctx)
     {
-        if (ctx.SizeDependentMethodImplOption is null)
+        string? option = ctx.SizeDependentMethodImplOption;
+        if (option == "Auto")
+            option = ctx.Instances.Count <= _aggressiveInliningInstanceThreshold ? "AggressiveInlining" : "NoInlining";
+
+        if (option is null)
             return;
 
         source.Append("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.")
-              .Append(ctx.SizeDependentMethodImplOption)
+              .Append(option)
               .AppendLine(")]");
     }
 
@@ -435,8 +442,7 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine("    {");
         source.AppendLine("        if (name is null) { result = default!; return false; }");
         source.AppendLine();
-        source.AppendLine("        return TryFromName(global::System.MemoryExtensions.AsSpan(name), out result);");
-        source.AppendLine();
+        AppendStringConstantSwitchBody(source, ctx.NameItems, "name", 2);
         source.AppendLine("    }");
         source.AppendLine();
 
@@ -455,7 +461,7 @@ public sealed partial class EnumValueSourceGenerator
               .AppendLine(".UnknownName(name);");
         source.AppendLine("    }");
         source.AppendLine();
-        AppendIsDefinedIsNameDefined(source, ctx.EnumTypeName, ctx.ValueTypeName, ctx.IsStringValue);
+        AppendIsDefinedIsNameDefined(source, ctx);
         source.AppendLine();
         AppendXmlSummary(source, "    ", "Deconstructs this instance into its name and value.");
         source.AppendLine(
@@ -509,21 +515,8 @@ public sealed partial class EnumValueSourceGenerator
                 source.AppendLine();
                 AppendXmlSummary(source, "    ", "Indicates whether this instance's value equals the specified string (ordinal comparison).");
                 AppendSizeDependentMethodImplAttribute(source, ctx);
-                source.AppendLine("    public bool Equals(string? other) => _id switch");
-                source.AppendLine("    {");
-                for (var i = 0; i < ctx.Instances.Count; i++)
-                {
-                    byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
-                    string valueConst = ctx.Instances[i].Name + "Value";
-                    source.Append("        ")
-                          .Append(instanceId)
-                          .Append(" => other == ")
-                          .Append(valueConst)
-                          .AppendLine(",");
-                }
-
-                source.AppendLine("        _ => false");
-                source.AppendLine("    };");
+                source.AppendLine("    public bool Equals(string? other)");
+                source.AppendLine("        => global::System.String.Equals(Value, other, global::System.StringComparison.Ordinal);");
                 source.AppendLine();
                 AppendXmlSummary(source, "    ", "Returns a value that indicates whether two instances are equal.");
                 source.Append("    public static bool operator ==(")
@@ -875,16 +868,7 @@ public sealed partial class EnumValueSourceGenerator
                 "            throw new global::System.Text.Json.JsonException(\"Expected string value. Token type: \" + reader.TokenType + \".\");");
             source.AppendLine();
 
-            for (var i = 0; i < ctx.Instances.Count; i++)
-            {
-                source.Append("        if (reader.ValueTextEquals(")
-                      .Append(ctx.Instances[i].ValueLiteral)
-                      .Append("u8)) return ")
-                      .Append(ctx.EnumTypeName)
-                      .Append(".")
-                      .Append(ctx.Instances[i].Name)
-                      .AppendLine(";");
-            }
+            AppendStjStringReadLookup(source, ctx);
 
             source.AppendLine("        string? rawStr = reader.GetString();");
             source.Append("        throw new global::System.Text.Json.JsonException($\"Cannot deserialize '")
@@ -913,26 +897,26 @@ public sealed partial class EnumValueSourceGenerator
         if (ctx.IsStringValue)
         {
             source.AppendLine("    {");
-            string refOrEq = ctx.EnumType.IsReferenceType ? "global::System.Object.ReferenceEquals(value, " : "value == ";
-            string refOrEqSuffix = ctx.EnumType.IsReferenceType ? ")" : "";
+            source.AppendLine("        switch (value.Value)");
+            source.AppendLine("        {");
             for (var i = 0; i < ctx.Instances.Count; i++)
             {
                 string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
-                source.Append("        if (")
-                      .Append(refOrEq)
+                source.Append("            case ")
                       .Append(ctx.EnumTypeName)
                       .Append(".")
                       .Append(ctx.Instances[i].Name)
-                      .Append(refOrEqSuffix)
-                      .Append(") { writer.WriteStringValue(\"")
+                      .Append("Value: writer.WriteStringValue(\"")
                       .Append(EscapeString(jsonStr))
-                      .Append("\"u8); return; }")
+                      .Append("\"u8); return;")
                       .AppendLine();
             }
 
-            source.Append("        ")
+            source.Append("            default: ")
                   .Append(ctx.StjWriteValueCode.Replace("{VALUE_EXPRESSION}", "value.Value"))
                   .AppendLine();
+            source.AppendLine("                return;");
+            source.AppendLine("        }");
             source.AppendLine("    }");
         }
         else
@@ -951,17 +935,7 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine("    {");
         if (ctx.IsStringValue)
         {
-            for (var i = 0; i < ctx.Instances.Count; i++)
-            {
-                string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
-                source.Append("        if (reader.ValueTextEquals(\"")
-                      .Append(EscapeString(jsonStr))
-                      .Append("\"u8)) return ")
-                      .Append(ctx.EnumTypeName)
-                      .Append(".")
-                      .Append(ctx.Instances[i].Name)
-                      .AppendLine(";");
-            }
+            AppendStjStringReadLookup(source, ctx);
         }
         else
         {
@@ -990,24 +964,23 @@ public sealed partial class EnumValueSourceGenerator
         if (ctx.IsStringValue)
         {
             source.AppendLine("    {");
-            string refOrEq = ctx.EnumType.IsReferenceType ? "global::System.Object.ReferenceEquals(value, " : "value == ";
-            string refOrEqSuffix = ctx.EnumType.IsReferenceType ? ")" : "";
+            source.AppendLine("        switch (value.Value)");
+            source.AppendLine("        {");
             for (var i = 0; i < ctx.Instances.Count; i++)
             {
                 string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
-                source.Append("        if (")
-                      .Append(refOrEq)
+                source.Append("            case ")
                       .Append(ctx.EnumTypeName)
                       .Append(".")
                       .Append(ctx.Instances[i].Name)
-                      .Append(refOrEqSuffix)
-                      .Append(") { writer.WritePropertyName(\"")
+                      .Append("Value: writer.WritePropertyName(\"")
                       .Append(EscapeString(jsonStr))
-                      .Append("\"u8); return; }")
+                      .Append("\"u8); return;")
                       .AppendLine();
             }
 
-            source.AppendLine("        writer.WritePropertyName(value.Value);");
+            source.AppendLine("            default: writer.WritePropertyName(value.Value); return;");
+            source.AppendLine("        }");
             source.AppendLine("    }");
         }
         else
@@ -1033,6 +1006,105 @@ public sealed partial class EnumValueSourceGenerator
         }
 
         source.AppendLine("}");
+    }
+
+    private static void AppendStjStringReadLookup(StringBuilder source, in EnumSourceBuildContext ctx)
+    {
+        if (ctx.Instances.Count < _stjDispatchInstanceThreshold)
+        {
+            for (var i = 0; i < ctx.Instances.Count; i++)
+                AppendStjValueTextEquals(source, ctx, i, 2);
+
+            return;
+        }
+
+        source.AppendLine("        if (reader.ValueIsEscaped || reader.HasValueSequence)");
+        source.AppendLine("        {");
+        source.AppendLine("            string? decodedValue = reader.GetString();");
+        source.Append("            if (")
+              .Append(ctx.EnumTypeName)
+              .AppendLine(".TryFromValue(decodedValue, out var decodedResult))");
+        source.AppendLine("                return decodedResult;");
+        source.AppendLine("        }");
+        source.AppendLine("        else");
+        source.AppendLine("        {");
+        source.AppendLine("            global::System.ReadOnlySpan<byte> rawValue = reader.ValueSpan;");
+        source.AppendLine("            switch (rawValue.Length)");
+        source.AppendLine("            {");
+
+        var lengths = new global::System.Collections.Generic.SortedDictionary<int, global::System.Collections.Generic.List<int>>();
+        for (var i = 0; i < ctx.Instances.Count; i++)
+        {
+            string value = ctx.Instances[i].StringValue ?? string.Empty;
+            int byteCount = Encoding.UTF8.GetByteCount(value);
+            if (!lengths.TryGetValue(byteCount, out global::System.Collections.Generic.List<int>? indexes))
+            {
+                indexes = new global::System.Collections.Generic.List<int>();
+                lengths.Add(byteCount, indexes);
+            }
+
+            indexes.Add(i);
+        }
+
+        foreach (global::System.Collections.Generic.KeyValuePair<int, global::System.Collections.Generic.List<int>> lengthGroup in lengths)
+        {
+            source.Append("                case ")
+                  .Append(lengthGroup.Key)
+                  .AppendLine(":");
+
+            if (lengthGroup.Key == 0 || lengthGroup.Value.Count == 1)
+            {
+                foreach (int index in lengthGroup.Value)
+                    AppendStjValueTextEquals(source, ctx, index, 5);
+            }
+            else
+            {
+                source.AppendLine("                    switch (rawValue[0])");
+                source.AppendLine("                    {");
+                var firstBytes = new global::System.Collections.Generic.SortedDictionary<byte, global::System.Collections.Generic.List<int>>();
+                foreach (int index in lengthGroup.Value)
+                {
+                    byte firstByte = Encoding.UTF8.GetBytes(ctx.Instances[index].StringValue ?? string.Empty)[0];
+                    if (!firstBytes.TryGetValue(firstByte, out global::System.Collections.Generic.List<int>? indexes))
+                    {
+                        indexes = new global::System.Collections.Generic.List<int>();
+                        firstBytes.Add(firstByte, indexes);
+                    }
+
+                    indexes.Add(index);
+                }
+
+                foreach (global::System.Collections.Generic.KeyValuePair<byte, global::System.Collections.Generic.List<int>> firstByteGroup in firstBytes)
+                {
+                    source.Append("                        case ")
+                          .Append(firstByteGroup.Key)
+                          .AppendLine(":");
+                    foreach (int index in firstByteGroup.Value)
+                        AppendStjValueTextEquals(source, ctx, index, 7);
+                    source.AppendLine("                            break;");
+                }
+
+                source.AppendLine("                    }");
+            }
+
+            source.AppendLine("                    break;");
+        }
+
+        source.AppendLine("            }");
+        source.AppendLine("        }");
+    }
+
+    private static void AppendStjValueTextEquals(StringBuilder source, in EnumSourceBuildContext ctx, int instanceIndex, int indentLevel)
+    {
+        EnumInstance instance = ctx.Instances[instanceIndex];
+        source.Append(' ', indentLevel * 4)
+              .Append("if (reader.ValueTextEquals(")
+              .Append(instance.ValueLiteral)
+              .Append("u8)) return ")
+              .Append(ctx.EnumTypeName)
+              .Append(".")
+              .Append(instance.Name)
+              .AppendLine(";");
     }
 
     private static void AppendNewtonsoftConverter(StringBuilder source, in EnumSourceBuildContext ctx)

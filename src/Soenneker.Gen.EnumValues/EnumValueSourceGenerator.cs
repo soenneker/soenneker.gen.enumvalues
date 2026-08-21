@@ -122,7 +122,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         if (string.Equals(value, "NoInlining", StringComparison.OrdinalIgnoreCase))
             return "NoInlining";
 
-        return "AggressiveInlining";
+        return "Auto";
     }
 
     private static EnumTypeCandidate? TryGetCandidate(GeneratorSyntaxContext syntaxContext)
@@ -537,50 +537,60 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         return source.ToString();
     }
 
-    private static void AppendIsDefinedIsNameDefined(StringBuilder source, string enumTypeName, string valueTypeName, bool isStringValue)
+    private static void AppendIsDefinedIsNameDefined(StringBuilder source, in EnumSourceBuildContext ctx)
     {
-        if (isStringValue)
+        if (ctx.IsStringValue)
         {
             AppendXmlSummary(source, "    ", "Returns whether a value is defined for the given string.");
-            source.AppendLine(
-                "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
-            source.Append("    public static bool IsDefined(string? value) => ")
-                  .Append(enumTypeName)
-                  .AppendLine(".TryFromValue(value, out _);");
+            AppendSizeDependentMethodImplAttribute(source, ctx);
+            source.AppendLine("    public static bool IsDefined(string? value) => value switch");
+            source.AppendLine("    {");
+            for (var i = 0; i < ctx.Instances.Count; i++)
+                source.Append("        ")
+                      .Append(ctx.Instances[i].Name)
+                      .AppendLine("Value => true,");
+            source.AppendLine("        _ => false");
+            source.AppendLine("    };");
             source.AppendLine();
             AppendXmlSummary(source, "    ", "Returns whether a value is defined for the given span.");
-            source.AppendLine(
-                "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            AppendSizeDependentMethodImplAttribute(source, ctx);
             source.Append("    public static bool IsDefined(global::System.ReadOnlySpan<char> value) => ")
-                  .Append(enumTypeName)
+                  .Append(ctx.EnumTypeName)
                   .AppendLine(".TryFromValue(value, out _);");
             source.AppendLine();
         }
         else
         {
             AppendXmlSummary(source, "    ", "Returns whether the given value is defined.");
-            source.AppendLine(
-                "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+            AppendSizeDependentMethodImplAttribute(source, ctx);
             source.Append("    public static bool IsDefined(")
-                  .Append(valueTypeName)
-                  .Append(" value) => ")
-                  .Append(enumTypeName)
-                  .AppendLine(".TryFromValue(value, out _);");
+                  .Append(ctx.ValueTypeName)
+                  .AppendLine(" value) => value switch");
+            source.AppendLine("    {");
+            for (var i = 0; i < ctx.Instances.Count; i++)
+                source.Append("        ")
+                      .Append(ctx.Instances[i].ValueLiteral)
+                      .AppendLine(" => true,");
+            source.AppendLine("        _ => false");
+            source.AppendLine("    };");
             source.AppendLine();
         }
 
         AppendXmlSummary(source, "    ", "Returns whether a name is defined.");
-        source.AppendLine(
-            "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
-        source.Append("    public static bool IsNameDefined(string? name) => ")
-              .Append(enumTypeName)
-              .AppendLine(".TryFromName(name, out _);");
+        AppendSizeDependentMethodImplAttribute(source, ctx);
+        source.AppendLine("    public static bool IsNameDefined(string? name) => name switch");
+        source.AppendLine("    {");
+        for (var i = 0; i < ctx.Instances.Count; i++)
+            source.Append("        ")
+                  .Append(ctx.Instances[i].Name)
+                  .AppendLine("Name => true,");
+        source.AppendLine("        _ => false");
+        source.AppendLine("    };");
         source.AppendLine();
         AppendXmlSummary(source, "    ", "Returns whether a name is defined for the given span.");
-        source.AppendLine(
-            "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+        AppendSizeDependentMethodImplAttribute(source, ctx);
         source.Append("    public static bool IsNameDefined(global::System.ReadOnlySpan<char> name) => ")
-              .Append(enumTypeName)
+              .Append(ctx.EnumTypeName)
               .AppendLine(".TryFromName(name, out _);");
     }
 

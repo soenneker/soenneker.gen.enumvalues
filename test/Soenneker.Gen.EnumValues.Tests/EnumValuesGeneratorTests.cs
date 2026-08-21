@@ -43,6 +43,11 @@ public sealed class EnumValuesGeneratorTests
         Enums.OrderStatus.TryFromName("Pending", out Enums.OrderStatus? fromName).Should().BeTrue();
         fromName.Should().BeSameAs(Enums.OrderStatus.Pending);
 
+        Enums.OrderStatus.IsDefined(1).Should().BeTrue();
+        Enums.OrderStatus.IsDefined(999).Should().BeFalse();
+        Enums.OrderStatus.IsNameDefined("Pending").Should().BeTrue();
+        Enums.OrderStatus.IsNameDefined("Missing").Should().BeFalse();
+
         Enums.OrderStatus.List.Count.Should().Be(2);
     }
 
@@ -59,6 +64,11 @@ public sealed class EnumValuesGeneratorTests
 
         Enums.ColorCode.TryFromName("Red", out Enums.ColorCode? fromName).Should().BeTrue();
         fromName.Should().BeSameAs(Enums.ColorCode.Red);
+
+        Enums.ColorCode.IsDefined("R").Should().BeTrue();
+        Enums.ColorCode.IsDefined("missing").Should().BeFalse();
+        Enums.ColorCode.IsNameDefined("Red").Should().BeTrue();
+        Enums.ColorCode.IsNameDefined("Missing").Should().BeFalse();
 
         Enums.ColorCode.List.Count.Should().Be(2);
     }
@@ -87,6 +97,35 @@ public sealed class EnumValuesGeneratorTests
 
         Action act2 = () => JsonSerializer.Deserialize<Enums.ColorCode>("\"Z\"");
         act2.Should().Throw<JsonException>();
+    }
+
+    [Test]
+    public void Large_string_enum_Json_round_trips_dispatched_escaped_and_Unicode_values()
+    {
+        JsonSerializer.Deserialize<Enums.LargeStringCode>("\"alpha\"").Should().BeSameAs(Enums.LargeStringCode.Alpha);
+        JsonSerializer.Deserialize<Enums.LargeStringCode>("\"hotel\"").Should().BeSameAs(Enums.LargeStringCode.Hotel);
+
+        string quotedJson = JsonSerializer.Serialize(Enums.LargeStringCode.Quoted);
+        JsonSerializer.Deserialize<Enums.LargeStringCode>(quotedJson).Should().BeSameAs(Enums.LargeStringCode.Quoted);
+
+        string unicodeJson = JsonSerializer.Serialize(Enums.LargeStringCode.Unicode);
+        JsonSerializer.Deserialize<Enums.LargeStringCode>(unicodeJson).Should().BeSameAs(Enums.LargeStringCode.Unicode);
+    }
+
+    [Test]
+    public void Large_string_enum_Json_property_names_round_trip()
+    {
+        var values = new System.Collections.Generic.Dictionary<Enums.LargeStringCode, int>
+        {
+            [Enums.LargeStringCode.Quoted] = 1,
+            [Enums.LargeStringCode.Unicode] = 2
+        };
+
+        string json = JsonSerializer.Serialize(values);
+        var roundTrip = JsonSerializer.Deserialize<System.Collections.Generic.Dictionary<Enums.LargeStringCode, int>>(json)!;
+
+        roundTrip[Enums.LargeStringCode.Quoted].Should().Be(1);
+        roundTrip[Enums.LargeStringCode.Unicode].Should().Be(2);
     }
 
     [Test]
