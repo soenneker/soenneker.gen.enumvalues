@@ -62,9 +62,9 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         category: "EnumValueGenerator", defaultSeverity: DiagnosticSeverity.Error, isEnabledByDefault: true);
 
     /// <summary>
-    /// Executes the initialize operation.
+    /// Initializes the enum value source generator so it is ready for use.
     /// </summary>
-    /// <param name="context">The context.</param>
+    /// <param name="context">HTTP context containing the Authorization header.</param>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         context.RegisterSourceOutput(context.CompilationProvider, static (sourceProductionContext, compilation) =>
