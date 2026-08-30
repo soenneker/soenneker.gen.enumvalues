@@ -42,12 +42,15 @@ public sealed partial class ColorCode
 
 The generator emits:
 
-- `List`
+- `Name` and `Value` instance properties
+- `Values` (`ReadOnlySpan<TEnum>`) and `List` (`IReadOnlyList<TEnum>`)
 - `<MemberName>Value` constants (for constant-friendly switch labels)
 - `TryFromValue(TValue value, out TEnum result)`
 - `FromValue(TValue value)`
 - `TryFromName(string name, out TEnum result)`
 - `FromName(string name)`
+- `IsDefined(TValue value)` and `IsNameDefined(string name)`
+- value equality, `ToString()`, deconstruction, and value conversion operators
 
 ## Lookups
 
@@ -64,6 +67,8 @@ if (ColorCode.TryFromName("Red", out var red))
     // red == ColorCode.Red
 }
 ```
+
+Name and string-value lookups use ordinal, case-sensitive matching. The `Try...` methods return `false` for unknown input; `FromValue` and `FromName` throw `ArgumentOutOfRangeException`.
 
 ## Switching over values
 
@@ -85,7 +90,7 @@ If your variable is already the raw value type (`int`, `string`, etc.), you can 
 
 ## Serialization
 
-`System.Text.Json` is always supported and the converter is applied automatically.
+`System.Text.Json` is always supported and the converter is applied automatically. JSON is read and written using the underlying `Value`, not the static member's `Name`; unknown values fail deserialization.
 
 `Newtonsoft.Json` is also supported automatically when your project references `Newtonsoft.Json`:
 
@@ -93,7 +98,7 @@ If your variable is already the raw value type (`int`, `string`, etc.), you can 
 dotnet add package Newtonsoft.Json
 ```
 
-After that, both serializers round-trip by `Value`.
+After that, both serializers round-trip by `Value`. A `TypeConverter` is also generated for configuration and model-binding scenarios that supply values as strings.
 
 `Value` and the value constructor are generated automatically if they do not already exist.
 
@@ -155,3 +160,5 @@ Supported values are `AggressiveInlining`, `NoInlining`, and `None`. `None` emit
 - Top-level non-generic class/struct types are supported.
 - Static instances must be initialized with a compile-time constant first constructor argument.
 - `<MemberName>Value` constants are emitted for const-compatible value types (for example: numeric types, `string`, `char`, `bool`).
+- Values must be unique. Duplicate values are reported as compile-time diagnostics.
+- String names and values are case-sensitive.
