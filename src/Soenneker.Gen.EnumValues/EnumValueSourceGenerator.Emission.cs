@@ -50,7 +50,7 @@ public sealed partial class EnumValueSourceGenerator
                   .Append(ctx.EnumTypeName)
                   .Append(">, global::System.IEquatable<")
                   .Append(ctx.ValueTypeName)
-                  .Append(">");
+                  .Append('>');
         source.AppendLine();
         source.AppendLine("{");
     }
@@ -107,7 +107,7 @@ public sealed partial class EnumValueSourceGenerator
             {
                 source.Append("    private ")
                       .Append(ctx.EnumType.Name)
-                      .Append("(")
+                      .Append('(')
                       .Append(ctx.ValueTypeName)
                       .Append(" value, byte id)");
                 source.AppendLine();
@@ -139,7 +139,7 @@ public sealed partial class EnumValueSourceGenerator
                 AppendIdFromValueMethod(source, ctx);
                 source.Append("    private ")
                       .Append(ctx.EnumType.Name)
-                      .Append("(")
+                      .Append('(')
                       .Append(ctx.ValueTypeName)
                       .Append(" value) : this(value, __idFromValue(value)) { }");
             }
@@ -147,7 +147,7 @@ public sealed partial class EnumValueSourceGenerator
             {
                 source.Append("    private ")
                       .Append(ctx.EnumType.Name)
-                      .Append("(")
+                      .Append('(')
                       .Append(ctx.ValueTypeName)
                       .Append(" value) => Value = value;");
             }
@@ -199,7 +199,7 @@ public sealed partial class EnumValueSourceGenerator
                 source.Append(condition)
                       .Append(" ? \"")
                       .Append(EscapeString(ctx.Instances[i].Name))
-                      .Append("\"");
+                      .Append('"');
                 if (i < ctx.Instances.Count - 1)
                     source.AppendLine();
             }
@@ -250,7 +250,7 @@ public sealed partial class EnumValueSourceGenerator
             emittedValueConstant = true;
             source.Append("    public const ")
                   .Append(ctx.ValueTypeName)
-                  .Append(" ")
+                  .Append(' ')
                   .Append(valueFieldName)
                   .Append(" = ")
                   .Append(ctx.Instances[i].ValueLiteral)
@@ -293,7 +293,7 @@ public sealed partial class EnumValueSourceGenerator
                 byte instanceId = ctx.Instances[i].Id ?? (byte)(i + 1);
                 source.Append("    public static readonly ")
                       .Append(ctx.EnumTypeName)
-                      .Append(" ")
+                      .Append(' ')
                       .Append(ctx.Instances[i].Name)
                       .Append(" = new(")
                       .Append(ctx.Instances[i].ValueLiteral)
@@ -304,7 +304,7 @@ public sealed partial class EnumValueSourceGenerator
             else
                 source.Append("    public static readonly ")
                       .Append(ctx.EnumTypeName)
-                      .Append(" ")
+                      .Append(' ')
                       .Append(ctx.Instances[i].Name)
                       .Append(" = new(")
                       .Append(ctx.Instances[i].ValueLiteral)
@@ -789,7 +789,7 @@ public sealed partial class EnumValueSourceGenerator
                 "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.Append("    public static explicit operator ")
                   .Append(ctx.ValueTypeName)
-                  .Append("(")
+                  .Append('(')
                   .Append(ctx.EnumTypeName)
                   .AppendLine(" value)");
             source.AppendLine("        => value.Value;");
@@ -904,7 +904,7 @@ public sealed partial class EnumValueSourceGenerator
                 string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
                 source.Append("            case ")
                       .Append(ctx.EnumTypeName)
-                      .Append(".")
+                      .Append('.')
                       .Append(ctx.Instances[i].Name)
                       .Append("Value: writer.WriteStringValue(\"")
                       .Append(EscapeString(jsonStr))
@@ -946,7 +946,7 @@ public sealed partial class EnumValueSourceGenerator
                       .Append(EscapeString(jsonStr))
                       .Append("\"u8)) return ")
                       .Append(ctx.EnumTypeName)
-                      .Append(".")
+                      .Append('.')
                       .Append(ctx.Instances[i].Name)
                       .AppendLine(";");
             }
@@ -971,7 +971,7 @@ public sealed partial class EnumValueSourceGenerator
                 string jsonStr = ctx.Instances[i].ValueJsonString ?? ctx.Instances[i].ValueLiteral;
                 source.Append("            case ")
                       .Append(ctx.EnumTypeName)
-                      .Append(".")
+                      .Append('.')
                       .Append(ctx.Instances[i].Name)
                       .Append("Value: writer.WritePropertyName(\"")
                       .Append(EscapeString(jsonStr))
@@ -1102,7 +1102,7 @@ public sealed partial class EnumValueSourceGenerator
               .Append(instance.ValueLiteral)
               .Append("u8)) return ")
               .Append(ctx.EnumTypeName)
-              .Append(".")
+              .Append('.')
               .Append(instance.Name)
               .AppendLine(";");
     }
