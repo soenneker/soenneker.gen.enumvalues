@@ -1064,7 +1064,8 @@ public sealed partial class EnumValueSourceGenerator
                 var firstBytes = new global::System.Collections.Generic.SortedDictionary<byte, global::System.Collections.Generic.List<int>>();
                 foreach (int index in lengthGroup.Value)
                 {
-                    byte firstByte = Encoding.UTF8.GetBytes(ctx.Instances[index].StringValue ?? string.Empty)[0];
+                    string value = ctx.Instances[index].StringValue ?? string.Empty;
+                    byte firstByte = value[0] <= 0x7f ? (byte)value[0] : Encoding.UTF8.GetBytes(value)[0];
                     if (!firstBytes.TryGetValue(firstByte, out global::System.Collections.Generic.List<int>? indexes))
                     {
                         indexes = new global::System.Collections.Generic.List<int>();

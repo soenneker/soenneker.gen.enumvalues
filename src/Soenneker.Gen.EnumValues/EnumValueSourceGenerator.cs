@@ -73,11 +73,9 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         });
 
         IncrementalValuesProvider<EnumTypeCandidate?> typeCandidates = context.SyntaxProvider.CreateSyntaxProvider(
-                                                                                  static (node, _) => node is TypeDeclarationSyntax
-                                                                                  {
-                                                                                      AttributeLists.Count: > 0
-                                                                                  }, static (syntaxContext, _) => TryGetCandidate(syntaxContext))
-                                                                              .Where(static candidate => candidate is not null);
+                static (node, _) => node is TypeDeclarationSyntax typeDeclaration && HasEnumValueAttributeSyntax(typeDeclaration),
+                static (syntaxContext, _) => TryGetCandidate(syntaxContext))
+            .Where(static candidate => candidate is not null);
 
         IncrementalValueProvider<string?> sizeDependentMethodImplOption = context.AnalyzerConfigOptionsProvider.Select(static (provider, _) =>
             GetSizeDependentMethodImplOption(provider.GlobalOptions.TryGetValue(_inliningPropertyName, out string? value) ? value : null));
@@ -123,6 +121,20 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
             return "NoInlining";
 
         return "Auto";
+    }
+
+    private static bool HasEnumValueAttributeSyntax(TypeDeclarationSyntax typeDeclaration)
+    {
+        foreach (AttributeListSyntax attributeList in typeDeclaration.AttributeLists)
+        {
+            foreach (AttributeSyntax attribute in attributeList.Attributes)
+            {
+                if (TryGetEnumValueAttributeTypeSyntax(attribute, out _))
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     private static EnumTypeCandidate? TryGetCandidate(GeneratorSyntaxContext syntaxContext)
