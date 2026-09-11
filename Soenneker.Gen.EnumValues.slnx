@@ -11,6 +11,7 @@
     <Project Path="src/Soenneker.Gen.EnumValues/Soenneker.Gen.EnumValues.csproj" />
   </Folder>
   <Folder Name="/test/">
+    <Project Path="test/Soenneker.Gen.EnumValues.Generator.Tests/Soenneker.Gen.EnumValues.Generator.Tests.csproj" />
     <Project Path="test/Soenneker.Gen.EnumValues.Tests/Soenneker.Gen.EnumValues.Tests.csproj" />
   </Folder>
 </Solution>

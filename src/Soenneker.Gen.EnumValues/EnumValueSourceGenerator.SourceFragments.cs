@@ -59,8 +59,8 @@ public sealed partial class EnumValueSourceGenerator
         }
     }
 
-    private static void AppendTypeConverterClass(StringBuilder source, INamedTypeSymbol enumType, INamedTypeSymbol valueType, string enumTypeName,
-        string valueTypeName, string typeConverterName, bool isStringValue)
+    private static void AppendTypeConverterClass(StringBuilder source, string enumTypeName, string typeConverterName, bool isStringValue,
+        string convertFromBody)
     {
         source.AppendLine("/// <summary>");
         source.Append("/// <see cref=\"global::System.ComponentModel.TypeConverter\"/> for ")
@@ -89,7 +89,7 @@ public sealed partial class EnumValueSourceGenerator
         }
         else
         {
-            source.Append(BuildTypeConverterConvertFromBody(valueType, enumTypeName));
+            source.Append(convertFromBody);
         }
 
         source.AppendLine("            return result;");
@@ -114,7 +114,7 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine("}");
     }
 
-    private static string BuildTypeConverterConvertFromBody(ITypeSymbol valueType, string enumTypeName)
+    internal static string BuildTypeConverterConvertFromBody(ITypeSymbol valueType, string enumTypeName)
     {
         switch (valueType.SpecialType)
         {

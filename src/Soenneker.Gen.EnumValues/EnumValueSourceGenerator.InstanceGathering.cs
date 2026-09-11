@@ -97,19 +97,19 @@ public sealed partial class EnumValueSourceGenerator
         return false;
     }
 
-    private static List<EnumInstance> GatherInstances(SourceProductionContext context, Compilation compilation, INamedTypeSymbol enumType,
+    private static List<EnumInstance> GatherInstances(EnumGenerationResult context, Compilation compilation, INamedTypeSymbol enumType,
         INamedTypeSymbol valueType)
     {
         return GatherInstancesCore(context, compilation, enumType, valueType, sourceTypeName: null);
     }
 
-    private static List<EnumInstance> GatherInstancesFromType(SourceProductionContext context, Compilation compilation, INamedTypeSymbol sourceType,
+    private static List<EnumInstance> GatherInstancesFromType(EnumGenerationResult context, Compilation compilation, INamedTypeSymbol sourceType,
         INamedTypeSymbol valueType, string sourceTypeName)
     {
         return GatherInstancesCore(context, compilation, sourceType, valueType, sourceTypeName);
     }
 
-    private static List<EnumInstance> GatherInstancesCore(SourceProductionContext context, Compilation compilation, INamedTypeSymbol enumType,
+    private static List<EnumInstance> GatherInstancesCore(EnumGenerationResult context, Compilation compilation, INamedTypeSymbol enumType,
         INamedTypeSymbol valueType, string? sourceTypeName)
     {
         var result = new List<EnumInstance>();

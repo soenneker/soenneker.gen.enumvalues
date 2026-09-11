@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Soenneker.Gen.EnumValues.Dtos;
 
@@ -10,6 +11,11 @@ public sealed partial class EnumValueSourceGenerator
 {
     private const int _aggressiveInliningInstanceThreshold = 8;
     private const int _stjDispatchInstanceThreshold = 8;
+
+    // CoreCLR caches invariant integer strings from 0 through 299. Keep its
+    // direct formatting path for these values; an extra switch measured slower.
+    private static bool IsSmallIntegerText(EnumInstance instance) =>
+        uint.TryParse(instance.ValueJsonString, NumberStyles.None, CultureInfo.InvariantCulture, out uint value) && value < 300;
 
     private static void AppendSizeDependentMethodImplAttribute(StringBuilder source, in EnumSourceBuildContext ctx)
     {
@@ -40,7 +46,7 @@ public sealed partial class EnumValueSourceGenerator
               .Append(ctx.TypeConverterName)
               .AppendLine("))]");
         source.Append(ctx.Kind == "class" ? "public sealed partial class " : "public partial struct ")
-              .Append(ctx.EnumType.Name);
+              .Append(ctx.EnumTypeSimpleName);
         if (ctx.IsStringValue)
             source.Append(" : global::System.IEquatable<")
                   .Append(ctx.EnumTypeName)
@@ -58,8 +64,8 @@ public sealed partial class EnumValueSourceGenerator
     private static void AppendValueNameConstructorsAndName(StringBuilder source, in EnumSourceBuildContext ctx)
     {
         bool useId = ctx.UseIdBacking;
-        bool storeValue = useId && ctx.EnumType.IsReferenceType;
-        bool storeName = useId && ctx.EnumType.IsReferenceType;
+        bool storeValue = useId && ctx.IsReferenceType;
+        bool storeName = useId && ctx.IsReferenceType;
         bool valuePropertyGenerated = !ctx.HasValueProperty;
 
         if (valuePropertyGenerated)
@@ -106,7 +112,7 @@ public sealed partial class EnumValueSourceGenerator
             if (useId)
             {
                 source.Append("    private ")
-                      .Append(ctx.EnumType.Name)
+                      .Append(ctx.EnumTypeSimpleName)
                       .Append('(')
                       .Append(ctx.ValueTypeName)
                       .Append(" value, byte id)");
@@ -138,7 +144,7 @@ public sealed partial class EnumValueSourceGenerator
                 source.AppendLine();
                 AppendIdFromValueMethod(source, ctx);
                 source.Append("    private ")
-                      .Append(ctx.EnumType.Name)
+                      .Append(ctx.EnumTypeSimpleName)
                       .Append('(')
                       .Append(ctx.ValueTypeName)
                       .Append(" value) : this(value, __idFromValue(value)) { }");
@@ -146,7 +152,7 @@ public sealed partial class EnumValueSourceGenerator
             else
             {
                 source.Append("    private ")
-                      .Append(ctx.EnumType.Name)
+                      .Append(ctx.EnumTypeSimpleName)
                       .Append('(')
                       .Append(ctx.ValueTypeName)
                       .Append(" value) => Value = value;");
@@ -193,7 +199,7 @@ public sealed partial class EnumValueSourceGenerator
             {
                 if (i > 0)
                     source.Append("     : ");
-                string condition = ctx.EnumType.IsReferenceType
+                string condition = ctx.IsReferenceType
                     ? "global::System.Object.ReferenceEquals(this, " + ctx.Instances[i].Name + ")"
                     : "global::System.Collections.Generic.EqualityComparer<" + ctx.EnumTypeName + ">.Default.Equals(this, " + ctx.Instances[i].Name + ")";
                 source.Append(condition)
@@ -238,13 +244,12 @@ public sealed partial class EnumValueSourceGenerator
         bool useId = ctx.UseIdBacking;
 
         var emittedValueConstant = false;
-        bool canEmitConstant = CanEmitConstant(ctx.ValueType);
+        bool canEmitConstant = ctx.CanEmitValueConstant;
 
         for (var i = 0; i < ctx.Instances.Count; i++)
         {
             string valueFieldName = ctx.Instances[i].Name + "Value";
-            if (!canEmitConstant || ctx.EnumType.GetMembers(valueFieldName)
-                                       .Length > 0)
+            if (!canEmitConstant || ctx.ExistingValueConstants[i])
                 continue;
 
             emittedValueConstant = true;
@@ -266,8 +271,7 @@ public sealed partial class EnumValueSourceGenerator
             for (var i = 0; i < ctx.Instances.Count; i++)
             {
                 string nameFieldName = ctx.Instances[i].Name + "Name";
-                if (ctx.EnumType.GetMembers(nameFieldName)
-                       .Length > 0)
+                if (ctx.ExistingNameConstants[i])
                     continue;
                 emittedNameConstant = true;
                 source.Append("    public const string ")
@@ -284,8 +288,7 @@ public sealed partial class EnumValueSourceGenerator
         var emittedInstance = false;
         for (var i = 0; i < ctx.Instances.Count; i++)
         {
-            if (ctx.EnumType.GetMembers(ctx.Instances[i].Name)
-                   .Length > 0)
+            if (ctx.ExistingInstances[i])
                 continue;
             emittedInstance = true;
             if (useId)
@@ -489,7 +492,7 @@ public sealed partial class EnumValueSourceGenerator
                   .AppendLine(" value)");
             source.AppendLine("        => value.Value;");
             source.AppendLine();
-            if (useId && ctx.EnumType.IsReferenceType)
+            if (useId && ctx.IsReferenceType)
             {
                 AppendXmlSummary(source, "    ", "Determines whether the specified object is equal to this instance.");
                 source.AppendLine(
@@ -535,7 +538,7 @@ public sealed partial class EnumValueSourceGenerator
                       .AppendLine("? right)");
                 source.AppendLine("        => !(left == right);");
             }
-            else if (useId && !ctx.EnumType.IsReferenceType)
+            else if (useId && !ctx.IsReferenceType)
             {
                 AppendXmlSummary(source, "    ", "Determines whether the specified object is equal to this instance.");
                 source.AppendLine(
@@ -593,7 +596,7 @@ public sealed partial class EnumValueSourceGenerator
                       .AppendLine(" right)");
                 source.AppendLine("        => left._id != right._id;");
             }
-            else if (ctx.EnumType.IsReferenceType)
+            else if (ctx.IsReferenceType)
             {
                 AppendXmlSummary(source, "    ", "Determines whether the specified object is equal to this instance.");
                 source.AppendLine(
@@ -699,9 +702,9 @@ public sealed partial class EnumValueSourceGenerator
                 "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
             source.Append("    public bool Equals(")
                   .Append(ctx.EnumTypeName)
-                  .Append(ctx.EnumType.IsReferenceType ? "? " : " ");
+                  .Append(ctx.IsReferenceType ? "? " : " ");
             source.Append("other)");
-            if (ctx.EnumType.IsReferenceType)
+            if (ctx.IsReferenceType)
                 source.AppendLine(" => other is not null && Value.Equals(other.Value);");
             else
                 source.AppendLine(" => Value.Equals(other.Value);");
@@ -777,12 +780,44 @@ public sealed partial class EnumValueSourceGenerator
             source.AppendLine("        => !right.Value.Equals(left);");
             source.AppendLine();
             AppendXmlSummary(source, "    ", "Returns the string representation of this instance.");
-            source.AppendLine(
-                "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
-            source.AppendLine("    public override string ToString()");
-            source.Append("        => ")
-                  .Append(BuildToStringExpression(ctx.ValueType))
-                  .AppendLine(";");
+            bool emitIntegerTextConstants = false;
+            if (ctx.ValueSpecialType is Microsoft.CodeAnalysis.SpecialType.System_Int32 or Microsoft.CodeAnalysis.SpecialType.System_Int64 or
+                Microsoft.CodeAnalysis.SpecialType.System_UInt32 or Microsoft.CodeAnalysis.SpecialType.System_UInt64)
+            {
+                foreach (EnumInstance instance in ctx.Instances)
+                {
+                    if (!IsSmallIntegerText(instance))
+                    {
+                        emitIntegerTextConstants = true;
+                        break;
+                    }
+                }
+            }
+            if (emitIntegerTextConstants)
+            {
+                AppendSizeDependentMethodImplAttribute(source, ctx);
+                source.AppendLine("    public override string ToString() => Value switch");
+                source.AppendLine("    {");
+                foreach (EnumInstance instance in ctx.Instances)
+                {
+                    if (IsSmallIntegerText(instance))
+                        continue;
+                    // JSON and invariant integer text agree.
+                    string text = instance.ValueJsonString ?? string.Empty;
+                    source.Append("        ").Append(instance.ValueLiteral).Append(" => \"")
+                        .Append(EscapeString(text)).AppendLine("\",");
+                }
+                // Capture the value so a custom getter is evaluated only once.
+                source.Append("        var value => ").Append(ctx.ToStringExpression.Replace("Value.", "value.")).AppendLine();
+                source.AppendLine("    };");
+            }
+            else
+            {
+                source.AppendLine(
+                    "    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]");
+                source.AppendLine("    public override string ToString()");
+                source.Append("        => ").Append(ctx.ToStringExpression).AppendLine(";");
+            }
             source.AppendLine();
             AppendXmlSummary(source, "    ", "Explicitly converts this instance to its underlying value.");
             source.AppendLine(
@@ -830,7 +865,7 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine("        => throw new global::System.ArgumentOutOfRangeException(nameof(name), name, \"Unknown enum name: '\" + name + \"'.\");");
         source.AppendLine("}");
         source.AppendLine();
-        AppendTypeConverterClass(source, ctx.EnumType, ctx.ValueType, ctx.EnumTypeName, ctx.ValueTypeName, ctx.TypeConverterName, ctx.IsStringValue);
+        AppendTypeConverterClass(source, ctx.EnumTypeName, ctx.TypeConverterName, ctx.IsStringValue, ctx.TypeConverterFromBody);
         source.AppendLine();
         AppendStjConverter(source, ctx);
 
@@ -840,7 +875,7 @@ public sealed partial class EnumValueSourceGenerator
 
     private static string GetThrowHelperTypeName(in EnumSourceBuildContext ctx)
     {
-        return "__" + ctx.EnumType.Name + "ThrowHelper";
+        return "__" + ctx.EnumTypeSimpleName + "ThrowHelper";
     }
 
     private static void AppendStjConverter(StringBuilder source, in EnumSourceBuildContext ctx)
@@ -999,13 +1034,73 @@ public sealed partial class EnumValueSourceGenerator
                       .AppendLine();
             }
 
-            source.Append(BuildStjWritePropertyNameFallback(ctx.ValueType))
+            source.Append(ctx.StjPropertyNameFallback)
                   .AppendLine();
             source.AppendLine("        }");
             source.AppendLine("    }");
         }
 
+        if (ctx.IsStringValue && ctx.Instances.Count >= _stjDispatchInstanceThreshold)
+        {
+            AppendStjDecodedLookup(source, ctx);
+            AppendStjUtf8Lookup(source, ctx);
+        }
+
         source.AppendLine("}");
+    }
+
+    private static void AppendStjDecodedLookup(StringBuilder source, in EnumSourceBuildContext ctx)
+    {
+        // Isolate stack allocation and decoding from the common contiguous UTF-8 path.
+        source.AppendLine("    [global::System.Runtime.CompilerServices.MethodImpl(global::System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]");
+        source.Append("    private static bool TryReadDecoded(ref global::System.Text.Json.Utf8JsonReader reader, out ")
+              .Append(ctx.EnumTypeName).AppendLine(" result)");
+        source.AppendLine("    {");
+        source.AppendLine("#if NET7_0_OR_GREATER");
+        source.AppendLine("        long length = reader.HasValueSequence ? reader.ValueSequence.Length : reader.ValueSpan.Length;");
+        source.AppendLine("        if (length <= 256)");
+        source.AppendLine("        {");
+        source.AppendLine("            global::System.Span<byte> decoded = stackalloc byte[256];");
+        source.AppendLine("            int written = reader.CopyString(decoded);");
+        source.AppendLine("            return TryReadUtf8(decoded.Slice(0, written), out result);");
+        source.AppendLine("        }");
+        source.AppendLine("#endif");
+        // Long inputs and older runtimes use the reader's allocation-free comparison.
+        // No stack allocation is sized from untrusted input.
+        for (var i = 0; i < ctx.Instances.Count; i++)
+        {
+            source.Append("        if (reader.ValueTextEquals(").Append(ctx.Instances[i].ValueLiteral).AppendLine("u8))");
+            source.AppendLine("        {");
+            source.Append("            result = ").Append(ctx.EnumTypeName).Append('.').Append(ctx.Instances[i].Name).AppendLine(";");
+            source.AppendLine("            return true;");
+            source.AppendLine("        }");
+        }
+        source.AppendLine("        result = default!;");
+        source.AppendLine("        return false;");
+        source.AppendLine("    }");
+    }
+
+    private static int GetUtf8DispatchIndex(in EnumSourceBuildContext ctx, System.Collections.Generic.List<int> indexes, int length)
+    {
+        // Minimize collisions instead of always probing the first byte. Values such
+        // as common-prefix-01 and common-prefix-02 otherwise become a linear scan.
+        var counts = new int[256];
+        int bestIndex = 0;
+        int bestScore = int.MaxValue;
+        for (var position = 0; position < length; position++)
+        {
+            System.Array.Clear(counts, 0, counts.Length);
+            int score = 0;
+            foreach (int index in indexes)
+                score += 2 * counts[ctx.ValueUtf8Bytes[index][position]]++ + 1;
+            if (score >= bestScore)
+                continue;
+            bestScore = score;
+            bestIndex = position;
+            if (score == indexes.Count)
+                break;
+        }
+        return bestIndex;
     }
 
     private static void AppendStjStringReadLookup(StringBuilder source, in EnumSourceBuildContext ctx)
@@ -1020,23 +1115,30 @@ public sealed partial class EnumValueSourceGenerator
 
         source.AppendLine("        if (reader.ValueIsEscaped || reader.HasValueSequence)");
         source.AppendLine("        {");
-        source.AppendLine("            string? decodedValue = reader.GetString();");
-        source.Append("            if (")
-              .Append(ctx.EnumTypeName)
-              .AppendLine(".TryFromValue(decodedValue, out var decodedResult))");
-        source.AppendLine("                return decodedResult;");
+        source.AppendLine("            if (TryReadDecoded(ref reader, out var decodedResult)) return decodedResult;");
         source.AppendLine("        }");
         source.AppendLine("        else");
         source.AppendLine("        {");
         source.AppendLine("            global::System.ReadOnlySpan<byte> rawValue = reader.ValueSpan;");
+        AppendStjUtf8Lookup(source, ctx, standalone: false);
+        source.AppendLine("        }");
+    }
+
+    private static void AppendStjUtf8Lookup(StringBuilder source, in EnumSourceBuildContext ctx, bool standalone = true)
+    {
+        if (standalone)
+        {
+            source.Append("    private static bool TryReadUtf8(global::System.ReadOnlySpan<byte> rawValue, out ")
+                  .Append(ctx.EnumTypeName).AppendLine(" result)");
+            source.AppendLine("    {");
+        }
         source.AppendLine("            switch (rawValue.Length)");
         source.AppendLine("            {");
 
         var lengths = new global::System.Collections.Generic.SortedDictionary<int, global::System.Collections.Generic.List<int>>();
         for (var i = 0; i < ctx.Instances.Count; i++)
         {
-            string value = ctx.Instances[i].StringValue ?? string.Empty;
-            int byteCount = Encoding.UTF8.GetByteCount(value);
+            int byteCount = ctx.ValueUtf8Bytes[i].Length;
             if (!lengths.TryGetValue(byteCount, out global::System.Collections.Generic.List<int>? indexes))
             {
                 indexes = new global::System.Collections.Generic.List<int>();
@@ -1055,17 +1157,17 @@ public sealed partial class EnumValueSourceGenerator
             if (lengthGroup.Key == 0 || lengthGroup.Value.Count == 1)
             {
                 foreach (int index in lengthGroup.Value)
-                    AppendStjValueTextEquals(source, ctx, index, 5);
+                    AppendUtf8Equals(source, ctx, index, 5, standalone);
             }
             else
             {
-                source.AppendLine("                    switch (rawValue[0])");
+                int dispatchIndex = GetUtf8DispatchIndex(ctx, lengthGroup.Value, lengthGroup.Key);
+                source.Append("                    switch (rawValue[").Append(dispatchIndex).AppendLine("])");
                 source.AppendLine("                    {");
                 var firstBytes = new global::System.Collections.Generic.SortedDictionary<byte, global::System.Collections.Generic.List<int>>();
                 foreach (int index in lengthGroup.Value)
                 {
-                    string value = ctx.Instances[index].StringValue ?? string.Empty;
-                    byte firstByte = value[0] <= 0x7f ? (byte)value[0] : Encoding.UTF8.GetBytes(value)[0];
+                    byte firstByte = ctx.ValueUtf8Bytes[index][dispatchIndex];
                     if (!firstBytes.TryGetValue(firstByte, out global::System.Collections.Generic.List<int>? indexes))
                     {
                         indexes = new global::System.Collections.Generic.List<int>();
@@ -1081,7 +1183,7 @@ public sealed partial class EnumValueSourceGenerator
                           .Append(firstByteGroup.Key)
                           .AppendLine(":");
                     foreach (int index in firstByteGroup.Value)
-                        AppendStjValueTextEquals(source, ctx, index, 7);
+                        AppendUtf8Equals(source, ctx, index, 7, standalone);
                     source.AppendLine("                            break;");
                 }
 
@@ -1092,7 +1194,20 @@ public sealed partial class EnumValueSourceGenerator
         }
 
         source.AppendLine("            }");
-        source.AppendLine("        }");
+        if (standalone)
+        {
+            source.AppendLine("        result = default!;");
+            source.AppendLine("        return false;");
+            source.AppendLine("    }");
+        }
+    }
+
+    private static void AppendUtf8Equals(StringBuilder source, in EnumSourceBuildContext ctx, int index, int indentLevel, bool standalone)
+    {
+        EnumInstance instance = ctx.Instances[index];
+        source.Append(' ', indentLevel * 4).Append("if (global::System.MemoryExtensions.SequenceEqual(rawValue, ")
+              .Append(instance.ValueLiteral).Append(standalone ? "u8)) { result = " : "u8)) { return ").Append(ctx.EnumTypeName).Append('.')
+              .Append(instance.Name).AppendLine(standalone ? "; return true; }" : "; }");
     }
 
     private static void AppendStjValueTextEquals(StringBuilder source, in EnumSourceBuildContext ctx, int instanceIndex, int indentLevel)
@@ -1110,11 +1225,11 @@ public sealed partial class EnumValueSourceGenerator
 
     private static void AppendNewtonsoftConverter(StringBuilder source, in EnumSourceBuildContext ctx)
     {
-        string newtonsoftReadRawValueCode = BuildNewtonsoftReadRawValueCode(ctx.ValueType);
-        string newtonsoftWriteValueCode = BuildNewtonsoftWriteValueCode(ctx.ValueType);
-        string readReturnType = ctx.EnumType.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
-        string existingValueType = ctx.EnumType.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
-        string writeValueType = ctx.EnumType.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
+        string newtonsoftReadRawValueCode = ctx.NewtonsoftReadCode;
+        string newtonsoftWriteValueCode = ctx.NewtonsoftWriteCode;
+        string readReturnType = ctx.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
+        string existingValueType = ctx.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
+        string writeValueType = ctx.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
 
         source.AppendLine();
         source.AppendLine("/// <summary>");
@@ -1134,7 +1249,7 @@ public sealed partial class EnumValueSourceGenerator
               .Append(existingValueType)
               .AppendLine(" existingValue, bool hasExistingValue, global::Newtonsoft.Json.JsonSerializer serializer)");
         source.AppendLine("    {");
-        if (ctx.EnumType.IsReferenceType)
+        if (ctx.IsReferenceType)
         {
             source.AppendLine("        if (reader.TokenType == global::Newtonsoft.Json.JsonToken.Null)");
             source.AppendLine("            return null;");
@@ -1163,7 +1278,7 @@ public sealed partial class EnumValueSourceGenerator
               .Append(writeValueType)
               .AppendLine(" value, global::Newtonsoft.Json.JsonSerializer serializer)");
         source.AppendLine("    {");
-        if (ctx.EnumType.IsReferenceType)
+        if (ctx.IsReferenceType)
         {
             source.AppendLine("        if (value is null)");
             source.AppendLine("        {");
