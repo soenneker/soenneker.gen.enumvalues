@@ -30,12 +30,12 @@
         <PackageReference Include="AwesomeAssertions" Version="9.6.0" />
         <PackageReference Include="Intellenum" Version="2.0.1" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-        <PackageReference Include="Soenneker.Tests.Attributes.Local" Version="4.0.114" />
+        <PackageReference Include="Soenneker.Tests.Attributes.Local" Version="4.0.115" />
         <PackageReference Include="Soenneker.Gen.Adapt" Version="4.0.93">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Soenneker.Tests.Benchmark" Version="4.0.163" />
+        <PackageReference Include="Soenneker.Tests.Benchmark" Version="4.0.164" />
         <PackageReference Include="TUnit" Version="1.68.4" />
     </ItemGroup>
 
