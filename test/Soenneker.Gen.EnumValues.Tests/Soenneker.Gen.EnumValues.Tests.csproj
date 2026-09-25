@@ -35,7 +35,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Soenneker.Tests.Benchmark" Version="4.0.170" />
+        <PackageReference Include="Soenneker.Tests.Benchmark" Version="4.0.171" />
         <PackageReference Include="TUnit" Version="1.69.16" />
     </ItemGroup>
 
