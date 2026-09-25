@@ -651,7 +651,8 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
                 if (valueType.ToDisplayString() == "System.Guid")
                     return "writer.WriteStringValue({VALUE_EXPRESSION});";
 
-                return "global::System.Text.Json.JsonSerializer.Serialize(writer, " + "{VALUE_EXPRESSION}" + ", options);";
+                string typeName = valueType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                return "global::System.Text.Json.JsonSerializer.Serialize(writer, {VALUE_EXPRESSION}, (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<" + typeName + ">)options.GetTypeInfo(typeof(" + typeName + ")));";
             }
         }
     }

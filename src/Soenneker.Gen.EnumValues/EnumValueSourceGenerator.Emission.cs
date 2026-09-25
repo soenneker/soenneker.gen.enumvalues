@@ -885,7 +885,7 @@ public sealed partial class EnumValueSourceGenerator
               .Append(ctx.EnumTypeName)
               .AppendLine(".");
         source.AppendLine("/// </summary>");
-        source.Append("file sealed class ")
+        source.Append("public sealed class ")
               .Append(ctx.StjConverterTypeName)
               .Append(" : global::System.Text.Json.Serialization.JsonConverter<")
               .Append(ctx.EnumTypeName)

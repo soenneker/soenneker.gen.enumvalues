@@ -54,7 +54,7 @@ public sealed partial class EnumValueSourceGenerator
                     return
                         "        if (reader.TokenType != global::System.Text.Json.JsonTokenType.String) throw new global::System.Text.Json.JsonException(\"Expected Guid string value. Token type: \" + reader.TokenType + \".\"); global::System.Guid rawValue = reader.GetGuid();";
 
-                return "        " + typeName + " rawValue = global::System.Text.Json.JsonSerializer.Deserialize<" + typeName + ">(ref reader, options)!;";
+                return "        " + typeName + " rawValue = global::System.Text.Json.JsonSerializer.Deserialize(ref reader, (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<" + typeName + ">)options.GetTypeInfo(typeof(" + typeName + ")))!;";
             }
         }
     }
