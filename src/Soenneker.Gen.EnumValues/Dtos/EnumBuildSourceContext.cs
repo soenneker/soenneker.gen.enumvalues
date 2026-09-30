@@ -13,20 +13,16 @@ internal readonly struct EnumSourceBuildContext : System.IEquatable<EnumSourceBu
     public readonly bool CanEmitValueConstant;
     public readonly string ToStringExpression;
     public readonly string StjPropertyNameFallback;
-    public readonly string NewtonsoftReadCode;
-    public readonly string NewtonsoftWriteCode;
     public readonly string TypeConverterFromBody;
     public readonly List<EnumInstance> Instances;
     public readonly bool HasValueProperty;
     public readonly bool HasValueIdConstructor;
     public readonly bool HasNameProperty;
-    public readonly bool SupportsNewtonsoft;
     public readonly string EnumTypeName;
     public readonly string ValueTypeName;
     public readonly string Ns;
     public readonly string Kind;
     public readonly string StjConverterTypeName;
-    public readonly string NewtonsoftConverterTypeName;
     public readonly string TypeConverterName;
     public readonly bool IsStringValue;
     public readonly bool UseIdBacking;
@@ -44,8 +40,8 @@ internal readonly struct EnumSourceBuildContext : System.IEquatable<EnumSourceBu
     public readonly bool[] ExistingInstances;
 
     public EnumSourceBuildContext(INamedTypeSymbol enumType, INamedTypeSymbol valueType, List<EnumInstance> instances, bool hasValueProperty,
-        bool hasValueIdConstructor, bool hasNameProperty, bool supportsNewtonsoft, string enumTypeName, string valueTypeName, string ns, string kind,
-        string stjConverterTypeName, string newtonsoftConverterTypeName, string typeConverterName, bool isStringValue, bool useIdBacking,
+        bool hasValueIdConstructor, bool hasNameProperty, string enumTypeName, string valueTypeName, string ns, string kind,
+        string stjConverterTypeName, string typeConverterName, bool isStringValue, bool useIdBacking,
         string valueTryFromSignature, List<(string ConstantName, string TargetName)> valueItems, List<(string ConstantName, string TargetName)> nameItems,
         List<(string Text, string TargetName)> nameSpanItems, List<(string Text, string TargetName)> valueSpanItems, string stjReadRawValueCode,
         string stjWriteValueCode, string? sizeDependentMethodImplOption)
@@ -57,20 +53,16 @@ internal readonly struct EnumSourceBuildContext : System.IEquatable<EnumSourceBu
         CanEmitValueConstant = EnumValueSourceGenerator.CanEmitConstant(valueType);
         ToStringExpression = EnumValueSourceGenerator.BuildToStringExpression(valueType);
         StjPropertyNameFallback = isStringValue ? string.Empty : EnumValueSourceGenerator.BuildStjWritePropertyNameFallback(valueType);
-        NewtonsoftReadCode = supportsNewtonsoft ? EnumValueSourceGenerator.BuildNewtonsoftReadRawValueCode(valueType) : string.Empty;
-        NewtonsoftWriteCode = supportsNewtonsoft ? EnumValueSourceGenerator.BuildNewtonsoftWriteValueCode(valueType) : string.Empty;
         TypeConverterFromBody = isStringValue ? string.Empty : EnumValueSourceGenerator.BuildTypeConverterConvertFromBody(valueType, enumTypeName);
         Instances = instances;
         HasValueProperty = hasValueProperty;
         HasValueIdConstructor = hasValueIdConstructor;
         HasNameProperty = hasNameProperty;
-        SupportsNewtonsoft = supportsNewtonsoft;
         EnumTypeName = enumTypeName;
         ValueTypeName = valueTypeName;
         Ns = ns;
         Kind = kind;
         StjConverterTypeName = stjConverterTypeName;
-        NewtonsoftConverterTypeName = newtonsoftConverterTypeName;
         TypeConverterName = typeConverterName;
         IsStringValue = isStringValue;
         UseIdBacking = useIdBacking;
@@ -103,7 +95,7 @@ internal readonly struct EnumSourceBuildContext : System.IEquatable<EnumSourceBu
         if (EnumTypeName != other.EnumTypeName || EnumTypeSimpleName != other.EnumTypeSimpleName || IsReferenceType != other.IsReferenceType || ValueTypeName != other.ValueTypeName ||
             Kind != other.Kind || ValueKind != other.ValueKind || ValueSpecialType != other.ValueSpecialType ||
             HasValueProperty != other.HasValueProperty || HasValueIdConstructor != other.HasValueIdConstructor ||
-            HasNameProperty != other.HasNameProperty || SupportsNewtonsoft != other.SupportsNewtonsoft ||
+            HasNameProperty != other.HasNameProperty ||
             SizeDependentMethodImplOption != other.SizeDependentMethodImplOption || Instances.Count != other.Instances.Count)
             return false;
         for (var i = 0; i < Instances.Count; i++)

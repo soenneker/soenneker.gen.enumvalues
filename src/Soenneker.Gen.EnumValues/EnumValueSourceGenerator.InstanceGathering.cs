@@ -15,12 +15,6 @@ namespace Soenneker.Gen.EnumValues;
 /// </summary>
 public sealed partial class EnumValueSourceGenerator
 {
-    private static bool SupportsNewtonsoft(Compilation compilation)
-    {
-        return compilation.GetTypeByMetadataName("Newtonsoft.Json.JsonConverterAttribute") is not null &&
-               compilation.GetTypeByMetadataName("Newtonsoft.Json.JsonConverter`1") is not null;
-    }
-
     private static bool IsPartial(INamedTypeSymbol enumType)
     {
         ImmutableArray<SyntaxReference> declarations = enumType.DeclaringSyntaxReferences;

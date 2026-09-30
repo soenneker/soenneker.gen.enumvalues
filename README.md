@@ -6,7 +6,7 @@
 # ![](https://user-images.githubusercontent.com/4441470/224455560-91ed3ee7-f510-4041-a8d2-3fc093025112.png) Soenneker.Gen.EnumValues
 ### High performance source generated enum values.
 
-Generate value objects with fast lookup APIs, switch-friendly constants, and built-in JSON serialization (System.Text.Json/Newtonsoft.Json).
+Generate value objects with fast lookup APIs, switch-friendly constants, and built-in JSON serialization (System.Text.Json).
 
 ## Installation
 
@@ -92,13 +92,8 @@ If your variable is already the raw value type (`int`, `string`, etc.), you can 
 
 `System.Text.Json` is always supported and the converter is applied automatically. JSON is read and written using the underlying `Value`, not the static member's `Name`; unknown values fail deserialization.
 
-`Newtonsoft.Json` is also supported automatically when your project references `Newtonsoft.Json`:
 
-```bash
-dotnet add package Newtonsoft.Json
-```
-
-After that, both serializers round-trip by `Value`. A `TypeConverter` is also generated for configuration and model-binding scenarios that supply values as strings.
+A `TypeConverter` is also generated for configuration and model-binding scenarios that supply values as strings.
 
 `Value` and the value constructor are generated automatically if they do not already exist.
 

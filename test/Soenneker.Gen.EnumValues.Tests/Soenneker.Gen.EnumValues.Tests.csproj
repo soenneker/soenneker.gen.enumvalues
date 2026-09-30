@@ -29,7 +29,6 @@
         <PackageReference Include="Ardalis.SmartEnum" Version="8.2.0" />
         <PackageReference Include="AwesomeAssertions" Version="9.6.0" />
         <PackageReference Include="Intellenum" Version="2.0.1" />
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
         <PackageReference Include="Soenneker.Tests.Attributes.Local" Version="4.0.127" />
         <PackageReference Include="Soenneker.Gen.Adapt" Version="4.0.96">
             <PrivateAssets>all</PrivateAssets>

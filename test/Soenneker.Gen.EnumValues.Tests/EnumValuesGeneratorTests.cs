@@ -213,22 +213,6 @@ public sealed class EnumValuesGeneratorTests
     }
 
     [Test]
-    public void Newtonsoft_json_round_trips_enum_values()
-    {
-        string intJson = global::Newtonsoft.Json.JsonConvert.SerializeObject(Enums.OrderStatus.Pending);
-        intJson.Should().Be("1");
-
-        var intValue = global::Newtonsoft.Json.JsonConvert.DeserializeObject<Enums.OrderStatus>("1");
-        intValue.Should().BeSameAs(Enums.OrderStatus.Pending);
-
-        string stringJson = global::Newtonsoft.Json.JsonConvert.SerializeObject(Enums.ColorCode.Red);
-        stringJson.Should().Be("\"R\"");
-
-        var stringValue = global::Newtonsoft.Json.JsonConvert.DeserializeObject<Enums.ColorCode>("\"R\"");
-        stringValue.Should().BeSameAs(Enums.ColorCode.Red);
-    }
-
-    [Test]
     public void Name_is_generated_for_class_enum_values()
     {
         Enums.ColorCode.Red.Name.Should().Be("Red");

@@ -1,6 +1,5 @@
 using System.Text.Json;
 using BenchmarkDotNet.Attributes;
-using Newtonsoft.Json;
 
 namespace Soenneker.Gen.EnumValues.Tests.Benchmarks;
 
@@ -58,39 +57,4 @@ public class SerializationBenchmark
         return System.Text.Json.JsonSerializer.Deserialize<ColorCodeSmartEnum>("\"R\"", _stjOptions)!;
     }
 
-    ////    [Benchmark]
-    //    public string GenEnumValues_Newtonsoft_Serialize()
-    //    {
-    //        return JsonConvert.SerializeObject(_genValue);
-    //    }
-
-    //  //  [Benchmark]
-    //    public string Intellenum_Newtonsoft_Serialize()
-    //    {
-    //        return JsonConvert.SerializeObject(_intellenumValue);
-    //    }
-
-    //    //[Benchmark]
-    //    public string SmartEnum_Newtonsoft_Serialize()
-    //    {
-    //        return JsonConvert.SerializeObject(_smartEnumValue);
-    //    }
-
-    //    //[Benchmark]
-    //    public ColorCode GenEnumValues_Newtonsoft_Deserialize()
-    //    {
-    //        return JsonConvert.DeserializeObject<ColorCode>("\"R\"")!;
-    //    }
-
-    //  //  [Benchmark]
-    //    public ColorCodeIntellenum Intellenum_Newtonsoft_Deserialize()
-    //    {
-    //        return JsonConvert.DeserializeObject<ColorCodeIntellenum>("\"R\"")!;
-    //    }
-
-    //   // [Benchmark]
-    //    public ColorCodeSmartEnum SmartEnum_Newtonsoft_Deserialize()
-    //    {
-    //        return JsonConvert.DeserializeObject<ColorCodeSmartEnum>("\"R\"")!;
-    //    }
 }

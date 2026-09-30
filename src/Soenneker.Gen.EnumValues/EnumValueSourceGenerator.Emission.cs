@@ -38,10 +38,6 @@ public sealed partial class EnumValueSourceGenerator
         source.Append("[global::System.Text.Json.Serialization.JsonConverter(typeof(")
               .Append(ctx.StjConverterTypeName)
               .AppendLine("))]");
-        if (ctx.SupportsNewtonsoft)
-            source.Append("[global::Newtonsoft.Json.JsonConverter(typeof(")
-                  .Append(ctx.NewtonsoftConverterTypeName)
-                  .AppendLine("))]");
         source.Append("[global::System.ComponentModel.TypeConverter(typeof(")
               .Append(ctx.TypeConverterName)
               .AppendLine("))]");
@@ -869,8 +865,6 @@ public sealed partial class EnumValueSourceGenerator
         source.AppendLine();
         AppendStjConverter(source, ctx);
 
-        if (ctx.SupportsNewtonsoft)
-            AppendNewtonsoftConverter(source, ctx);
     }
 
     private static string GetThrowHelperTypeName(in EnumSourceBuildContext ctx)
@@ -1223,75 +1217,4 @@ public sealed partial class EnumValueSourceGenerator
               .AppendLine(";");
     }
 
-    private static void AppendNewtonsoftConverter(StringBuilder source, in EnumSourceBuildContext ctx)
-    {
-        string newtonsoftReadRawValueCode = ctx.NewtonsoftReadCode;
-        string newtonsoftWriteValueCode = ctx.NewtonsoftWriteCode;
-        string readReturnType = ctx.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
-        string existingValueType = ctx.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
-        string writeValueType = ctx.IsReferenceType ? ctx.EnumTypeName + "?" : ctx.EnumTypeName;
-
-        source.AppendLine();
-        source.AppendLine("/// <summary>");
-        source.Append("/// Newtonsoft.Json converter for ")
-              .Append(ctx.EnumTypeName)
-              .AppendLine(".");
-        source.AppendLine("/// </summary>");
-        source.Append("file sealed class ")
-              .Append(ctx.NewtonsoftConverterTypeName)
-              .Append(" : global::Newtonsoft.Json.JsonConverter<")
-              .Append(ctx.EnumTypeName)
-              .AppendLine(">");
-        source.AppendLine("{");
-        source.Append("    public override ")
-              .Append(readReturnType)
-              .Append(" ReadJson(global::Newtonsoft.Json.JsonReader reader, global::System.Type objectType, ")
-              .Append(existingValueType)
-              .AppendLine(" existingValue, bool hasExistingValue, global::Newtonsoft.Json.JsonSerializer serializer)");
-        source.AppendLine("    {");
-        if (ctx.IsReferenceType)
-        {
-            source.AppendLine("        if (reader.TokenType == global::Newtonsoft.Json.JsonToken.Null)");
-            source.AppendLine("            return null;");
-            source.AppendLine();
-        }
-        else
-        {
-            source.AppendLine("        if (reader.TokenType == global::Newtonsoft.Json.JsonToken.Null)");
-            source.AppendLine("            throw new global::Newtonsoft.Json.JsonSerializationException(\"Cannot convert null to a value type enum value.\");");
-            source.AppendLine();
-        }
-
-        source.Append(newtonsoftReadRawValueCode);
-        source.AppendLine();
-        source.Append("        if (")
-              .Append(ctx.EnumTypeName)
-              .AppendLine(".TryFromValue(rawValue, out var result))");
-        source.AppendLine("            return result;");
-        source.AppendLine();
-        source.Append("        throw new global::Newtonsoft.Json.JsonSerializationException($\"Cannot deserialize '")
-              .Append(ctx.EnumTypeName)
-              .AppendLine("': unknown value '\" + rawValue + \"'.\");");
-        source.AppendLine("    }");
-        source.AppendLine();
-        source.Append("    public override void WriteJson(global::Newtonsoft.Json.JsonWriter writer, ")
-              .Append(writeValueType)
-              .AppendLine(" value, global::Newtonsoft.Json.JsonSerializer serializer)");
-        source.AppendLine("    {");
-        if (ctx.IsReferenceType)
-        {
-            source.AppendLine("        if (value is null)");
-            source.AppendLine("        {");
-            source.AppendLine("            writer.WriteNull();");
-            source.AppendLine("            return;");
-            source.AppendLine("        }");
-            source.AppendLine();
-        }
-
-        source.Append("        ")
-              .Append(newtonsoftWriteValueCode.Replace("{VALUE_EXPRESSION}", "value.Value"))
-              .AppendLine();
-        source.AppendLine("    }");
-        source.AppendLine("}");
-    }
 }

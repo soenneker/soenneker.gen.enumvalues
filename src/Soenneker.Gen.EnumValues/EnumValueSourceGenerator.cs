@@ -486,8 +486,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         bool hasValueIdConstructor = HasValueIdConstructor(enumType, valueType);
         bool hasNameProperty = HasNameProperty(enumType);
 
-        bool supportsNewtonsoft = SupportsNewtonsoft(compilation);
-        context.BuildContext = BuildContext(enumType, valueType, instances, hasValueProperty, hasValueIdConstructor, hasNameProperty, supportsNewtonsoft,
+        context.BuildContext = BuildContext(enumType, valueType, instances, hasValueProperty, hasValueIdConstructor, hasNameProperty,
             sizeDependentMethodImplOption);
         context.HintName = $"{enumType.Name}.EnumValues.g.cs";
     }
@@ -504,7 +503,7 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
     }
 
     private static EnumSourceBuildContext BuildContext(INamedTypeSymbol enumType, INamedTypeSymbol valueType, List<EnumInstance> instances, bool hasValueProperty,
-        bool hasValueIdConstructor, bool hasNameProperty, bool supportsNewtonsoft, string? sizeDependentMethodImplOption)
+        bool hasValueIdConstructor, bool hasNameProperty, string? sizeDependentMethodImplOption)
     {
         string enumTypeName = enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         string valueTypeName = valueType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -512,9 +511,9 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
         bool isStringValue = valueType.SpecialType == SpecialType.System_String;
         bool useIdBacking = isStringValue;
 
-        var ctx = new EnumSourceBuildContext(enumType, valueType, instances, hasValueProperty, hasValueIdConstructor, hasNameProperty, supportsNewtonsoft,
+        var ctx = new EnumSourceBuildContext(enumType, valueType, instances, hasValueProperty, hasValueIdConstructor, hasNameProperty,
             enumTypeName, valueTypeName, ns, enumType.TypeKind == TypeKind.Struct ? "struct" : "class", enumType.Name + "JsonConverter",
-            enumType.Name + "NewtonsoftJsonConverter", enumType.Name + "TypeConverter", isStringValue, useIdBacking,
+            enumType.Name + "TypeConverter", isStringValue, useIdBacking,
             isStringValue ? "string? value" : valueTypeName + " value", isStringValue
                 ? instances.Select(static instance => (instance.Name + "Value", instance.Name))
                            .ToList()
@@ -653,73 +652,6 @@ public sealed partial class EnumValueSourceGenerator : IIncrementalGenerator
 
                 string typeName = valueType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                 return "global::System.Text.Json.JsonSerializer.Serialize(writer, {VALUE_EXPRESSION}, (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<" + typeName + ">)options.GetTypeInfo(typeof(" + typeName + ")));";
-            }
-        }
-    }
-
-    internal static string BuildNewtonsoftReadRawValueCode(ITypeSymbol valueType)
-    {
-        string typeName = valueType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-
-        switch (valueType.SpecialType)
-        {
-            case SpecialType.System_Int32:
-                return "        int rawValue = global::System.Convert.ToInt32(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            case SpecialType.System_Int64:
-                return "        long rawValue = global::System.Convert.ToInt64(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            case SpecialType.System_Int16:
-                return "        short rawValue = global::System.Convert.ToInt16(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            case SpecialType.System_Byte:
-                return "        byte rawValue = global::System.Convert.ToByte(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            case SpecialType.System_SByte:
-                return "        sbyte rawValue = global::System.Convert.ToSByte(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            case SpecialType.System_UInt16:
-                return "        ushort rawValue = global::System.Convert.ToUInt16(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            case SpecialType.System_UInt32:
-                return "        uint rawValue = global::System.Convert.ToUInt32(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            case SpecialType.System_UInt64:
-                return "        ulong rawValue = global::System.Convert.ToUInt64(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            case SpecialType.System_String:
-                return
-                    "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected string value. Token type: \" + reader.TokenType + \".\"); string rawValue = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected non-null string value. Token type: \" + reader.TokenType + \".\");";
-            case SpecialType.System_Char:
-                return
-                    "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected char value. Token type: \" + reader.TokenType + \".\"); string charText = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected char value.\"); if (charText == null || charText.Length != 1) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected single-character value. Got: \" + (charText ?? \"(null)\") + \".\"); char rawValue = charText[0];";
-            case SpecialType.System_Boolean:
-                return "        bool rawValue = global::System.Convert.ToBoolean(reader.Value, global::System.Globalization.CultureInfo.InvariantCulture);";
-            default:
-            {
-                if (valueType.ToDisplayString() == "System.Guid")
-                    return
-                        "        if (reader.TokenType != global::Newtonsoft.Json.JsonToken.String) throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected Guid string value. Token type: \" + reader.TokenType + \".\"); string guidText = (string?)reader.Value ?? throw new global::Newtonsoft.Json.JsonSerializationException(\"Expected Guid string value.\"); global::System.Guid rawValue = global::System.Guid.Parse(guidText);";
-
-                return "        " + typeName + " rawValue = serializer.Deserialize<" + typeName + ">(reader)!;";
-            }
-        }
-    }
-
-    internal static string BuildNewtonsoftWriteValueCode(ITypeSymbol valueType)
-    {
-        switch (valueType.SpecialType)
-        {
-            case SpecialType.System_Int32:
-            case SpecialType.System_Int16:
-            case SpecialType.System_Int64:
-            case SpecialType.System_Byte:
-            case SpecialType.System_SByte:
-            case SpecialType.System_UInt16:
-            case SpecialType.System_UInt32:
-            case SpecialType.System_UInt64:
-            case SpecialType.System_String:
-            case SpecialType.System_Char:
-            case SpecialType.System_Boolean:
-                return "writer.WriteValue({VALUE_EXPRESSION});";
-            default:
-            {
-                if (valueType.ToDisplayString() == "System.Guid")
-                    return "writer.WriteValue({VALUE_EXPRESSION});";
-
-                return "serializer.Serialize(writer, " + "{VALUE_EXPRESSION}" + ");";
             }
         }
     }
