@@ -30,11 +30,11 @@
         <PackageReference Include="AwesomeAssertions" Version="9.6.0" />
         <PackageReference Include="Intellenum" Version="2.0.1" />
         <PackageReference Include="Soenneker.Tests.Attributes.Local" Version="4.0.147" />
-        <PackageReference Include="Soenneker.Gen.Adapt" Version="4.0.106">
+        <PackageReference Include="Soenneker.Gen.Adapt" Version="4.0.108">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Soenneker.Tests.Benchmark" Version="4.0.206" />
+        <PackageReference Include="Soenneker.Tests.Benchmark" Version="4.0.207" />
         <PackageReference Include="TUnit" Version="1.75.0" />
     </ItemGroup>
 
