@@ -30,13 +30,13 @@
         <PackageReference Include="Ardalis.SmartEnum" Version="8.2.0" />
         <PackageReference Include="AwesomeAssertions" Version="9.6.0" />
         <PackageReference Include="Intellenum" Version="2.0.1" />
-        <PackageReference Include="Soenneker.Tests.Attributes.Local" Version="11.0.161" />
+        <PackageReference Include="Soenneker.Tests.Attributes.Local" Version="11.0.162" />
         <PackageReference Include="Soenneker.Gen.Adapt" Version="11.0.110">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Soenneker.Tests.Benchmark" Version="11.0.225" />
-        <PackageReference Include="TUnit" Version="1.78.0" />
+        <PackageReference Include="TUnit" Version="1.79.0" />
     </ItemGroup>
 
     <ItemGroup>
